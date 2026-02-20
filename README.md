@@ -84,8 +84,8 @@ Wednesday at 8:30 AM PST and anyone is welcome.
 
 ### Maintainers
 
+- [Cyrille Le Clerc](https://github.com/cyrille-leclerc), Grafana Labs
 - [Juliano Costa](https://github.com/julianocosta89), Datadog
-- [Mikko Viitanen](https://github.com/mviitane), Dynatrace
 - [Pierre Tessier](https://github.com/puckpuck), Honeycomb
 - [Roger Coll](https://github.com/rogercoll), Elastic
 
@@ -94,6 +94,7 @@ For more information about the maintainer role, see the [community repository](h
 ### Approvers
 
 - [Cedric Ziel](https://github.com/cedricziel), Grafana Labs
+- [Mikko Viitanen](https://github.com/mviitane), Dynatrace
 - [Shenoy Pratik](https://github.com/ps48), AWS OpenSearch
 
 For more information about the approver role, see the [community repository](https://github.com/open-telemetry/community/blob/main/guides/contributor/membership.md#approver).
@@ -138,6 +139,7 @@ For more information about the emeritus role, see the [community repository](htt
 [Honeycomb.io]: https://github.com/honeycombio/opentelemetry-demo
 [Instana]: https://github.com/instana/opentelemetry-demo
 [Kloudfuse]: https://github.com/kloudfuse/opentelemetry-demo
+[Kopai]: https://github.com/kopai-app/opentelemetry-demo/tree/main/kopai
 [Last9]: https://last9.io/docs/integrations-opentelemetry-demo/
 [Liatrio]: https://github.com/liatrio/opentelemetry-demo
 [Logz.io]: https://logz.io/learn/how-to-run-opentelemetry-demo-with-logz-io/
