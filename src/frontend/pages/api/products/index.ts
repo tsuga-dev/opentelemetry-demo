@@ -16,53 +16,26 @@ const handler = async ({ method, query }: NextApiRequest, res: NextApiResponse<T
       const startTime = Date.now();
       const { currencyCode = '' } = query;
 
-      try {
-        logger.info({
-          event: 'product_list_requested',
-          currency: currencyCode as string,
-        }, 'Fetching product catalog');
+      logger.info({
+        event: 'product_list_requested',
+        currency: currencyCode as string,
+      }, 'Fetching product catalog');
 
-        const productList = await ProductCatalogService.listProducts(currencyCode as string);
+      const productList = await ProductCatalogService.listProducts(currencyCode as string);
 
-        const duration = Date.now() - startTime;
-        metrics.productCatalogViews.add(1, {
-          currency: currencyCode as string,
-        });
-        metrics.apiDuration.record(duration, {
-          endpoint: '/api/products',
-          method: 'GET',
-          status: 'success',
-        });
+      const duration = Date.now() - startTime;
+      metrics.productCatalogViews.add(1, {
+        currency: currencyCode as string,
+      });
 
-        logger.info({
-          event: 'product_list_served',
-          productCount: productList.length,
-          currency: currencyCode as string,
-          durationMs: duration,
-        }, 'Product catalog served successfully');
+      logger.info({
+        event: 'product_list_served',
+        productCount: productList.length,
+        currency: currencyCode as string,
+        durationMs: duration,
+      }, 'Product catalog served successfully');
 
-        return res.status(200).json(productList);
-      } catch (error) {
-        const duration = Date.now() - startTime;
-        metrics.apiDuration.record(duration, {
-          endpoint: '/api/products',
-          method: 'GET',
-          status: 'error',
-        });
-        metrics.apiErrors.add(1, {
-          endpoint: '/api/products',
-          error_type: error instanceof Error ? error.name : 'unknown',
-        });
-
-        logger.error({
-          event: 'product_list_failed',
-          currency: currencyCode as string,
-          error: error instanceof Error ? error.message : String(error),
-          durationMs: duration,
-        }, 'Failed to fetch product catalog');
-
-        throw error;
-      }
+      return res.status(200).json(productList);
     }
 
     default: {
