@@ -7,11 +7,17 @@ the release.
 
 ## Unreleased
 
-* [checkout] Add comprehensive metrics and trace-correlated logs for checkout operations, order processing, and Kafka publishing
-* [product-catalog] Add comprehensive metrics and trace-correlated logs for database operations, product views, and searches
-* [payment] Add comprehensive metrics and trace-correlated logs for payment processing, card validation, and fraud detection
-* [frontend] Add comprehensive API metrics and trace-correlated structured logging across all API routes (checkout, cart, products, recommendations, shipping, ads)
-* [email] Add comprehensive metrics and trace-correlated logs for email sending, queue management, and feature flag evaluation
+* [checkout] Add comprehensive metrics and trace-correlated logs for checkout
+  operations, order processing, and Kafka publishing
+* [product-catalog] Add comprehensive metrics and trace-correlated logs for
+  database operations, product views, and searches
+* [payment] Add comprehensive metrics and trace-correlated logs for payment
+  processing, card validation, and fraud detection
+* [frontend] Add comprehensive API metrics and trace-correlated structured
+  logging across all API routes (checkout, cart, products, recommendations,
+  shipping, ads)
+* [email] Add comprehensive metrics and trace-correlated logs for email
+  sending, queue management, and feature flag evaluation
 * [accounting] fix memory leak with dbcontext
   ([#2876](https://github.com/open-telemetry/opentelemetry-demo/pull/2876))
 * [chore] Upgrade OTel Collector to v0.145.0 with :warning: breaking change:
