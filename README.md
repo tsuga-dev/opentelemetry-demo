@@ -139,7 +139,6 @@ For more information about the emeritus role, see the [community repository](htt
 [Honeycomb.io]: https://github.com/honeycombio/opentelemetry-demo
 [Instana]: https://github.com/instana/opentelemetry-demo
 [Kloudfuse]: https://github.com/kloudfuse/opentelemetry-demo
-[Kopai]: https://github.com/kopai-app/opentelemetry-demo/tree/main/kopai
 [Last9]: https://last9.io/docs/integrations-opentelemetry-demo/
 [Liatrio]: https://github.com/liatrio/opentelemetry-demo
 [Logz.io]: https://logz.io/learn/how-to-run-opentelemetry-demo-with-logz-io/
