@@ -1,6 +1,6 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
-const { context, propagation, trace, metrics } = require('@opentelemetry/api');
+const { context, propagation, trace, metrics, SpanStatusCode } = require('@opentelemetry/api');
 const cardValidator = require('simple-card-validator');
 const { v4: uuidv4 } = require('uuid');
 
@@ -68,7 +68,6 @@ module.exports.charge = async request => {
           'error_type': 'simulated_failure',
         });
         
-        span.end();
         throw new Error('Payment request failed. Invalid token. app.loyalty.level=gold');
       }
     }
@@ -202,7 +201,6 @@ module.exports.charge = async request => {
     });
     
     transactionsCounter.add(1, { 'app.payment.currency': currencyCode });
-    span.end();
 
     return { transactionId };
     
@@ -226,7 +224,12 @@ module.exports.charge = async request => {
       error: error.message,
       error_type: errorType,
     });
-    
+
+    span.recordException(error);
+    span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
+
     throw error;
+  } finally {
+    span.end();
   }
 };

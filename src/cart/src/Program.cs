@@ -10,6 +10,7 @@ using System.Threading;
 using Grpc.Core;
 
 using cart.cartstore;
+using cart.interceptors;
 using cart.services;
 using cart.healthcheck;
 
@@ -86,7 +87,10 @@ builder.Services.AddOpenTelemetry()
         .AddAspNetCoreInstrumentation()
         .SetExemplarFilter(ExemplarFilterType.TraceBased)
         .AddOtlpExporter());
-builder.Services.AddGrpc();
+builder.Services.AddGrpc(options =>
+{
+    options.Interceptors.Add<RpcExceptionTelemetryInterceptor>();
+});
 builder.Services.AddSingleton<readinessCheck>();
 builder.Services.AddGrpcHealthChecks()
     .AddCheck<readinessCheck>("oteldemo.CartService");
@@ -107,5 +111,4 @@ app.MapGet("/", async context =>
 });
 
 app.Run();
-
 
