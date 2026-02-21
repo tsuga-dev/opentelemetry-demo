@@ -28,67 +28,39 @@ def fetch_product_reviews(product_id):
         return json.dumps({"error": str(e)})
 
 def fetch_product_reviews_from_db(request_product_id):
-
-    connection = None
-
     cursor_factory = CommenterCursorFactory(with_opentelemetry=True,with_db_driver=True)
 
-    try:
-        with psycopg2.connect(db_connection_str, cursor_factory=cursor_factory) as connection:
+    with psycopg2.connect(db_connection_str, cursor_factory=cursor_factory) as connection:
+        with connection.cursor() as cursor:
+            # Define the SQL query
+            query = "SELECT username, description, score FROM reviews.productreviews WHERE product_id= %s"
 
-            with connection.cursor() as cursor:
-                # Define the SQL query
-                query = "SELECT username, description, score FROM reviews.productreviews WHERE product_id= %s"
+            # Execute the query
+            cursor.execute(query, (request_product_id, ))
 
-                # Execute the query
-                cursor.execute(query, (request_product_id, ))
-
-                # Fetch all the rows from the query result
-                records = cursor.fetchall()
-                return records
-
-    except Exception as e:
-        raise e
-    finally:
-        if connection is not None:
-            try:
-                connection.close()
-            except Exception as e:
-                pass
+            # Fetch all the rows from the query result
+            records = cursor.fetchall()
+            return records
 
 def fetch_avg_product_review_score_from_db(request_product_id):
+    with psycopg2.connect(db_connection_str) as connection:
+        with connection.cursor() as cursor:
+            # Define the SQL query
+            query = "SELECT AVG(score) FROM reviews.productreviews WHERE product_id= %s"
 
-    connection = None
+            # Execute the query
+            cursor.execute(query, (request_product_id, ))
 
-    try:
-        with psycopg2.connect(db_connection_str) as connection:
+            # Fetch all the rows from the query result
+            records = cursor.fetchall()
 
-            with connection.cursor() as cursor:
-                # Define the SQL query
-                query = "SELECT AVG(score) FROM reviews.productreviews WHERE product_id= %s"
+            # Extract the average score
+            if records:
+                # records will be a list like [(average_score,)]
+                average_score = records[0][0]
+            else:
+                # Handle the case where no records are returned (e.g., no reviews for the product)
+                average_score = None
 
-                # Execute the query
-                cursor.execute(query, (request_product_id, ))
-
-                # Fetch all the rows from the query result
-                records = cursor.fetchall()
-
-                # Extract the average score
-                if records:
-                    # records will be a list like [(average_score,)]
-                    average_score = records[0][0]
-                else:
-                    # Handle the case where no records are returned (e.g., no reviews for the product)
-                    average_score = None
-
-                # return the score as a string rounded to 1 decimal place
-                return f"{average_score:.1f}"
-
-    except Exception as e:
-        raise e
-    finally:
-        if connection is not None:
-            try:
-                connection.close()
-            except Exception as e:
-                pass
+            # return the score as a string rounded to 1 decimal place
+            return f"{average_score:.1f}"

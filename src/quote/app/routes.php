@@ -14,14 +14,14 @@ use Slim\App;
 
 function calculateQuote($jsonObject): float
 {
-    $quote = 0.0;
     $childSpan = Globals::tracerProvider()->getTracer('manual-instrumentation')
         ->spanBuilder('calculate-quote')
         ->setSpanKind(SpanKind::KIND_INTERNAL)
         ->startSpan();
     $childSpan->addEvent('Calculating quote');
 
-    try {
+    try
+    {
         if (!array_key_exists('numberOfItems', $jsonObject)) {
             throw new \InvalidArgumentException('numberOfItems not provided');
         }
@@ -40,11 +40,12 @@ function calculateQuote($jsonObject): float
             ->getMeter('quotes')
             ->createCounter('quotes', 'quotes', 'number of quotes calculated');
         $counter->add(1, ['number_of_items' => $numberOfItems]);
-    } catch (\Exception $exception) {
+        return $quote;
+    } catch (\Throwable $exception) {
         $childSpan->recordException($exception);
+        throw $exception;
     } finally {
         $childSpan->end();
-        return $quote;
     }
 }
 
