@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -38,6 +39,7 @@ import (
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/propagation"
 
 	sdklog "go.opentelemetry.io/otel/sdk/log"
@@ -66,6 +68,7 @@ var logger *slog.Logger
 var tracer trace.Tracer
 var resource *sdkresource.Resource
 var initResourcesOnce sync.Once
+var checkoutMetrics *CheckoutMetrics
 
 func initResource() *sdkresource.Resource {
 	initResourcesOnce.Do(func() {
@@ -196,6 +199,7 @@ func main() {
 	openfeature.AddHooks(otelhooks.NewTracesHook())
 
 	tracer = tp.Tracer("checkout")
+	checkoutMetrics = initMetrics()
 
 	svc := new(checkout)
 	svc.httpClient = &http.Client{
@@ -291,32 +295,72 @@ func (cs *checkout) Watch(req *healthpb.HealthCheckRequest, ws healthpb.Health_W
 }
 
 func (cs *checkout) PlaceOrder(ctx context.Context, req *pb.PlaceOrderRequest) (*pb.PlaceOrderResponse, error) {
+	startTime := time.Now()
+
+	// Track active checkout sessions
+	checkoutMetrics.ActiveCheckoutSessions.Add(ctx, 1)
+	defer checkoutMetrics.ActiveCheckoutSessions.Add(ctx, -1)
+
 	span := trace.SpanFromContext(ctx)
 	span.SetAttributes(
 		attribute.String("app.user.id", req.UserId),
 		attribute.String("app.user.currency", req.UserCurrency),
 	)
+
 	logger.LogAttrs(
 		ctx,
-		slog.LevelInfo, "[PlaceOrder]",
+		slog.LevelInfo, "Checkout initiated",
 		slog.String("user_id", req.UserId),
+		slog.String("email", req.Email),
 		slog.String("user_currency", req.UserCurrency),
+		slog.String("country", req.Address.Country),
 	)
 
 	var err error
+	checkoutStatus := "success"
 	defer func() {
+		duration := time.Since(startTime).Seconds()
+
+		// Record checkout attempt
+		statusAttr := attribute.String("status", checkoutStatus)
+		checkoutMetrics.CheckoutAttemptsTotal.Add(ctx, 1, metric.WithAttributes(statusAttr))
+
+		// Record checkout duration
+		checkoutMetrics.CheckoutDuration.Record(ctx, duration, metric.WithAttributes(statusAttr))
+
 		if err != nil {
 			span.RecordError(err)
+			logger.LogAttrs(
+				ctx,
+				slog.LevelError, "Checkout failed",
+				slog.String("error", err.Error()),
+				slog.String("user_id", req.UserId),
+				slog.Float64("duration_seconds", duration),
+			)
 		}
 	}()
 
 	orderID, err := uuid.NewUUID()
 	if err != nil {
+		checkoutStatus = "failure"
+		errorTypeAttr := attribute.String("error_type", "uuid_generation_failed")
+		checkoutMetrics.CheckoutErrorsTotal.Add(ctx, 1, metric.WithAttributes(errorTypeAttr))
 		return nil, status.Errorf(codes.Internal, "failed to generate order uuid")
 	}
 
 	prep, err := cs.prepareOrderItemsAndShippingQuoteFromCart(ctx, req.UserId, req.UserCurrency, req.Address)
 	if err != nil {
+		checkoutStatus = "failure"
+		errorType := "cart_preparation_failed"
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "cart failure") {
+			errorType = "cart_service_error"
+		} else if strings.Contains(errMsg, "shipping") {
+			errorType = "shipping_unavailable"
+		}
+		checkoutMetrics.CheckoutErrorsTotal.Add(ctx, 1, metric.WithAttributes(
+			attribute.String("error_type", errorType),
+		))
 		return nil, status.Errorf(codes.Internal, err.Error())
 	}
 	span.AddEvent("prepared")
@@ -330,8 +374,23 @@ func (cs *checkout) PlaceOrder(ctx context.Context, req *pb.PlaceOrderRequest) (
 		total = money.Must(money.Sum(total, multPrice))
 	}
 
+	// Calculate total price for metrics and logging
+	totalPriceFloat, _ := strconv.ParseFloat(fmt.Sprintf("%d.%02d", total.GetUnits(), total.GetNanos()/1000000000), 64)
+
 	txID, err := cs.chargeCard(ctx, total, req.CreditCard)
 	if err != nil {
+		checkoutStatus = "failure"
+		checkoutMetrics.CheckoutErrorsTotal.Add(ctx, 1, metric.WithAttributes(
+			attribute.String("error_type", "payment_failed"),
+		))
+		logger.LogAttrs(
+			ctx,
+			slog.LevelError, "Payment processing failed",
+			slog.String("error", err.Error()),
+			slog.String("user_id", req.UserId),
+			slog.Float64("amount", totalPriceFloat),
+			slog.String("currency", req.UserCurrency),
+		)
 		return nil, status.Errorf(codes.Internal, "failed to charge card: %+v", err)
 	}
 
@@ -339,16 +398,37 @@ func (cs *checkout) PlaceOrder(ctx context.Context, req *pb.PlaceOrderRequest) (
 		trace.WithAttributes(attribute.String("app.payment.transaction.id", txID)))
 	logger.LogAttrs(
 		ctx,
-		slog.LevelInfo, "payment went through",
+		slog.LevelInfo, "Payment processed successfully",
 		slog.String("transaction_id", txID),
+		slog.String("user_id", req.UserId),
+		slog.Float64("amount", totalPriceFloat),
+		slog.String("currency", req.UserCurrency),
 	)
 
 	shippingTrackingID, err := cs.shipOrder(ctx, req.Address, prep.cartItems)
 	if err != nil {
+		checkoutStatus = "failure"
+		checkoutMetrics.CheckoutErrorsTotal.Add(ctx, 1, metric.WithAttributes(
+			attribute.String("error_type", "shipping_unavailable"),
+		))
+		logger.LogAttrs(
+			ctx,
+			slog.LevelError, "Shipping order failed",
+			slog.String("error", err.Error()),
+			slog.String("user_id", req.UserId),
+			slog.String("country", req.Address.Country),
+		)
 		return nil, status.Errorf(codes.Unavailable, "shipping error: %+v", err)
 	}
 	shippingTrackingAttribute := attribute.String("app.shipping.tracking.id", shippingTrackingID)
 	span.AddEvent("shipped", trace.WithAttributes(shippingTrackingAttribute))
+
+	logger.LogAttrs(
+		ctx,
+		slog.LevelInfo, "Order shipped",
+		slog.String("tracking_id", shippingTrackingID),
+		slog.String("user_id", req.UserId),
+	)
 
 	_ = cs.emptyUserCart(ctx, req.UserId)
 
@@ -361,7 +441,12 @@ func (cs *checkout) PlaceOrder(ctx context.Context, req *pb.PlaceOrderRequest) (
 	}
 
 	shippingCostFloat, _ := strconv.ParseFloat(fmt.Sprintf("%d.%02d", prep.shippingCostLocalized.GetUnits(), prep.shippingCostLocalized.GetNanos()/1000000000), 64)
-	totalPriceFloat, _ := strconv.ParseFloat(fmt.Sprintf("%d.%02d", total.GetUnits(), total.GetNanos()/1000000000), 64)
+
+	// Record business metrics
+	checkoutMetrics.OrderValueTotal.Add(ctx, totalPriceFloat, metric.WithAttributes(
+		attribute.String("currency", req.UserCurrency),
+	))
+	checkoutMetrics.ItemsPerOrder.Record(ctx, int64(len(prep.orderItems)))
 
 	span.SetAttributes(
 		attribute.String("app.order.id", orderID.String()),
@@ -381,14 +466,31 @@ func (cs *checkout) PlaceOrder(ctx context.Context, req *pb.PlaceOrderRequest) (
 	)
 
 	if err := cs.sendOrderConfirmation(ctx, req.Email, orderResult); err != nil {
-		logger.Warn(fmt.Sprintf("failed to send order confirmation to %q: %+v", req.Email, err))
+		// Log warning but don't fail checkout - email is non-critical
+		logger.LogAttrs(
+			ctx,
+			slog.LevelWarn, "Failed to send order confirmation email",
+			slog.String("error", err.Error()),
+			slog.String("order_id", orderID.String()),
+			slog.String("user_id", req.UserId),
+		)
 	} else {
-		logger.Info(fmt.Sprintf("order confirmation email sent to %q", req.Email))
+		logger.LogAttrs(
+			ctx,
+			slog.LevelInfo, "Order confirmation email sent",
+			slog.String("order_id", orderID.String()),
+			slog.String("user_id", req.UserId),
+		)
 	}
 
 	// send to kafka only if kafka broker address is set
 	if cs.kafkaBrokerSvcAddr != "" {
-		logger.Info("sending to postProcessor")
+		logger.LogAttrs(
+			ctx,
+			slog.LevelInfo, "Sending order to Kafka for post-processing",
+			slog.String("order_id", orderID.String()),
+			slog.String("topic", "orders"),
+		)
 		cs.sendToPostProcessor(ctx, orderResult)
 	}
 
@@ -630,7 +732,12 @@ func (cs *checkout) shipOrder(ctx context.Context, address *pb.Address, items []
 func (cs *checkout) sendToPostProcessor(ctx context.Context, result *pb.OrderResult) {
 	message, err := proto.Marshal(result)
 	if err != nil {
-		logger.Error(fmt.Sprintf("Failed to marshal message to protobuf: %+v", err))
+		logger.LogAttrs(
+			ctx,
+			slog.LevelError, "Failed to marshal Kafka message",
+			slog.String("error", err.Error()),
+			slog.String("order_id", result.OrderId),
+		)
 		return
 	}
 
@@ -649,26 +756,60 @@ func (cs *checkout) sendToPostProcessor(ctx context.Context, result *pb.OrderRes
 	case cs.KafkaProducerClient.Input() <- &msg:
 		select {
 		case successMsg := <-cs.KafkaProducerClient.Successes():
+			duration := time.Since(startTime).Seconds()
 			span.SetAttributes(
 				attribute.Bool("messaging.kafka.producer.success", true),
 				attribute.Int("messaging.kafka.producer.duration_ms", int(time.Since(startTime).Milliseconds())),
 				attribute.KeyValue(semconv.MessagingKafkaMessageOffset(int(successMsg.Offset))),
 			)
-			logger.Info(fmt.Sprintf("Successful to write message. offset: %v, duration: %v", successMsg.Offset, time.Since(startTime)))
+
+			// Record Kafka publish metrics
+			checkoutMetrics.KafkaPublishDuration.Record(ctx, duration, metric.WithAttributes(
+				attribute.String("topic", kafka.Topic),
+			))
+
+			logger.LogAttrs(
+				ctx,
+				slog.LevelInfo, "Kafka message published successfully",
+				slog.String("order_id", result.OrderId),
+				slog.Int64("offset", successMsg.Offset),
+				slog.Float64("duration_seconds", duration),
+				slog.String("topic", kafka.Topic),
+			)
 		case errMsg := <-cs.KafkaProducerClient.Errors():
+			duration := time.Since(startTime).Seconds()
 			span.SetAttributes(
 				attribute.Bool("messaging.kafka.producer.success", false),
 				attribute.Int("messaging.kafka.producer.duration_ms", int(time.Since(startTime).Milliseconds())),
 			)
 			span.SetStatus(otelcodes.Error, errMsg.Err.Error())
-			logger.Error(fmt.Sprintf("Failed to write message: %v", errMsg.Err))
+
+			// Record Kafka publish metrics
+			checkoutMetrics.KafkaPublishDuration.Record(ctx, duration, metric.WithAttributes(
+				attribute.String("topic", kafka.Topic),
+			))
+
+			logger.LogAttrs(
+				ctx,
+				slog.LevelError, "Kafka message publish failed",
+				slog.String("error", errMsg.Err.Error()),
+				slog.String("order_id", result.OrderId),
+				slog.String("topic", kafka.Topic),
+				slog.Float64("duration_seconds", duration),
+			)
 		case <-ctx.Done():
 			span.SetAttributes(
 				attribute.Bool("messaging.kafka.producer.success", false),
 				attribute.Int("messaging.kafka.producer.duration_ms", int(time.Since(startTime).Milliseconds())),
 			)
 			span.SetStatus(otelcodes.Error, "Context cancelled: "+ctx.Err().Error())
-			logger.Warn(fmt.Sprintf("Context canceled before success message received: %v", ctx.Err()))
+			logger.LogAttrs(
+				ctx,
+				slog.LevelWarn, "Kafka publish cancelled",
+				slog.String("error", ctx.Err().Error()),
+				slog.String("order_id", result.OrderId),
+				slog.String("topic", kafka.Topic),
+			)
 		}
 	case <-ctx.Done():
 		span.SetAttributes(
@@ -676,20 +817,35 @@ func (cs *checkout) sendToPostProcessor(ctx context.Context, result *pb.OrderRes
 			attribute.Int("messaging.kafka.producer.duration_ms", int(time.Since(startTime).Milliseconds())),
 		)
 		span.SetStatus(otelcodes.Error, "Failed to send: "+ctx.Err().Error())
-		logger.Error(fmt.Sprintf("Failed to send message to Kafka within context deadline: %v", ctx.Err()))
+		logger.LogAttrs(
+			ctx,
+			slog.LevelError, "Kafka message send timeout",
+			slog.String("error", ctx.Err().Error()),
+			slog.String("order_id", result.OrderId),
+			slog.String("topic", kafka.Topic),
+		)
 		return
 	}
 
 	ffValue := cs.getIntFeatureFlag(ctx, "kafkaQueueProblems")
 	if ffValue > 0 {
-		logger.Info("Warning: FeatureFlag 'kafkaQueueProblems' is activated, overloading queue now.")
+		logger.LogAttrs(
+			ctx,
+			slog.LevelWarn, "Feature flag activated: Kafka queue overload simulation",
+			slog.Int("extra_messages", ffValue),
+			slog.String("flag_name", "kafkaQueueProblems"),
+		)
 		for i := 0; i < ffValue; i++ {
 			go func(i int) {
 				cs.KafkaProducerClient.Input() <- &msg
 				_ = <-cs.KafkaProducerClient.Successes()
 			}(i)
 		}
-		logger.Info(fmt.Sprintf("Done with #%d messages for overload simulation.", ffValue))
+		logger.LogAttrs(
+			ctx,
+			slog.LevelInfo, "Kafka queue overload simulation completed",
+			slog.Int("messages_sent", ffValue),
+		)
 	}
 }
 
@@ -730,6 +886,19 @@ func (cs *checkout) isFeatureFlagEnabled(ctx context.Context, featureFlagName st
 		openfeature.EvaluationContext{},
 	)
 
+	// Track feature flag evaluations
+	checkoutMetrics.FeatureFlagEvaluations.Add(ctx, 1, metric.WithAttributes(
+		attribute.String("flag_name", featureFlagName),
+		attribute.Bool("value", featureEnabled),
+	))
+
+	logger.LogAttrs(
+		ctx,
+		slog.LevelDebug, "Feature flag evaluated",
+		slog.String("flag_name", featureFlagName),
+		slog.Bool("enabled", featureEnabled),
+	)
+
 	return featureEnabled
 }
 
@@ -742,6 +911,19 @@ func (cs *checkout) getIntFeatureFlag(ctx context.Context, featureFlagName strin
 		featureFlagName,
 		0,
 		openfeature.EvaluationContext{},
+	)
+
+	// Track feature flag evaluations
+	checkoutMetrics.FeatureFlagEvaluations.Add(ctx, 1, metric.WithAttributes(
+		attribute.String("flag_name", featureFlagName),
+		attribute.Int64("value", featureFlagValue),
+	))
+
+	logger.LogAttrs(
+		ctx,
+		slog.LevelDebug, "Feature flag evaluated",
+		slog.String("flag_name", featureFlagName),
+		slog.Int64("value", featureFlagValue),
 	)
 
 	return int(featureFlagValue)
