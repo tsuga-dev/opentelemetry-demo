@@ -63,6 +63,7 @@ var (
 	initResourcesOnce sync.Once
 	db                *sql.DB
 	reg               metric.Registration
+	catalogMetrics    *ProductCatalogMetrics
 )
 
 func init() {
@@ -228,6 +229,9 @@ func main() {
 		logger.Error(err.Error())
 	}
 
+	// Initialize catalog metrics
+	catalogMetrics = initCatalogMetrics()
+
 	svc := &productCatalog{}
 	var port string
 	mustMapEnv(&port, "PRODUCT_CATALOG_PORT")
@@ -267,8 +271,14 @@ func main() {
 
 func loadProductsFromDB(ctx context.Context) ([]*pb.Product, error) {
 	if db == nil {
+		catalogMetrics.DBErrorsTotal.Add(ctx, 1, metric.WithAttributes(
+			attribute.String("error_type", "connection_not_initialized"),
+		))
 		return nil, fmt.Errorf("database connection not initialized")
 	}
+
+	// Track query start time
+	startTime := time.Now()
 
 	// Query all products with categories
 	rows, err := db.QueryContext(ctx, `
@@ -278,6 +288,15 @@ func loadProductsFromDB(ctx context.Context) ([]*pb.Product, error) {
 		ORDER BY p.id
 	`)
 	if err != nil {
+		catalogMetrics.DBErrorsTotal.Add(ctx, 1, metric.WithAttributes(
+			attribute.String("error_type", "query_failed"),
+		))
+		logger.LogAttrs(
+			ctx,
+			slog.LevelError, "Database query failed",
+			slog.String("error", err.Error()),
+			slog.String("query_type", "list_all_products"),
+		)
 		return nil, fmt.Errorf("failed to query products: %w", err)
 	}
 	defer rows.Close()
@@ -287,13 +306,36 @@ func loadProductsFromDB(ctx context.Context) ([]*pb.Product, error) {
 		return nil, fmt.Errorf("failed to get products from rows: %w", err)
 	}
 
+	// Record query metrics
+	duration := time.Since(startTime).Seconds()
+	catalogMetrics.DBQueryDuration.Record(ctx, duration, metric.WithAttributes(
+		attribute.String("query_type", "list_all_products"),
+	))
+	catalogMetrics.DBQueryRowsReturned.Record(ctx, int64(len(products)), metric.WithAttributes(
+		attribute.String("query_type", "list_all_products"),
+	))
+
+	logger.LogAttrs(
+		ctx,
+		slog.LevelDebug, "Database query executed",
+		slog.String("query_type", "list_all_products"),
+		slog.Float64("duration_seconds", duration),
+		slog.Int("rows_returned", len(products)),
+	)
+
 	return products, nil
 }
 
 func searchProductsFromDB(ctx context.Context, query string) ([]*pb.Product, error) {
 	if db == nil {
+		catalogMetrics.DBErrorsTotal.Add(ctx, 1, metric.WithAttributes(
+			attribute.String("error_type", "connection_not_initialized"),
+		))
 		return nil, fmt.Errorf("database connection not initialized")
 	}
+
+	// Track query start time
+	startTime := time.Now()
 
 	// Query products matching search query in name or description
 	searchPattern := "%" + strings.ToLower(query) + "%"
@@ -305,6 +347,16 @@ func searchProductsFromDB(ctx context.Context, query string) ([]*pb.Product, err
 		ORDER BY p.id
 	`, searchPattern)
 	if err != nil {
+		catalogMetrics.DBErrorsTotal.Add(ctx, 1, metric.WithAttributes(
+			attribute.String("error_type", "query_failed"),
+		))
+		logger.LogAttrs(
+			ctx,
+			slog.LevelError, "Database search query failed",
+			slog.String("error", err.Error()),
+			slog.String("query_type", "search_products"),
+			slog.String("search_query", query),
+		)
 		return nil, fmt.Errorf("failed to query products: %w", err)
 	}
 	defer rows.Close()
@@ -314,13 +366,37 @@ func searchProductsFromDB(ctx context.Context, query string) ([]*pb.Product, err
 		return nil, fmt.Errorf("failed to get products from rows: %w", err)
 	}
 
+	// Record query metrics
+	duration := time.Since(startTime).Seconds()
+	catalogMetrics.DBQueryDuration.Record(ctx, duration, metric.WithAttributes(
+		attribute.String("query_type", "search_products"),
+	))
+	catalogMetrics.DBQueryRowsReturned.Record(ctx, int64(len(products)), metric.WithAttributes(
+		attribute.String("query_type", "search_products"),
+	))
+
+	logger.LogAttrs(
+		ctx,
+		slog.LevelDebug, "Database search query executed",
+		slog.String("query_type", "search_products"),
+		slog.String("search_query", query),
+		slog.Float64("duration_seconds", duration),
+		slog.Int("rows_returned", len(products)),
+	)
+
 	return products, nil
 }
 
 func getProductFromDB(ctx context.Context, productID string) (*pb.Product, error) {
 	if db == nil {
+		catalogMetrics.DBErrorsTotal.Add(ctx, 1, metric.WithAttributes(
+			attribute.String("error_type", "connection_not_initialized"),
+		))
 		return nil, fmt.Errorf("database connection not initialized")
 	}
+
+	// Track query start time
+	startTime := time.Now()
 
 	// Query single product by ID
 	row := db.QueryRowContext(ctx, `
@@ -336,10 +412,44 @@ func getProductFromDB(ctx context.Context, productID string) (*pb.Product, error
 
 	if err := row.Scan(&id, &name, &description, &picture, &currencyCode, &units, &nanos, &categoriesStr); err != nil {
 		if err == sql.ErrNoRows {
+			catalogMetrics.DBQueryRowsReturned.Record(ctx, 0, metric.WithAttributes(
+				attribute.String("query_type", "get_product_by_id"),
+			))
+			logger.LogAttrs(
+				ctx,
+				slog.LevelDebug, "Product not found in database",
+				slog.String("product_id", productID),
+			)
 			return nil, fmt.Errorf("product not found")
 		}
+		catalogMetrics.DBErrorsTotal.Add(ctx, 1, metric.WithAttributes(
+			attribute.String("error_type", "scan_failed"),
+		))
+		logger.LogAttrs(
+			ctx,
+			slog.LevelError, "Failed to scan product row",
+			slog.String("error", err.Error()),
+			slog.String("product_id", productID),
+		)
 		return nil, fmt.Errorf("failed to scan product row: %w", err)
 	}
+
+	// Record query metrics
+	duration := time.Since(startTime).Seconds()
+	catalogMetrics.DBQueryDuration.Record(ctx, duration, metric.WithAttributes(
+		attribute.String("query_type", "get_product_by_id"),
+	))
+	catalogMetrics.DBQueryRowsReturned.Record(ctx, 1, metric.WithAttributes(
+		attribute.String("query_type", "get_product_by_id"),
+	))
+
+	logger.LogAttrs(
+		ctx,
+		slog.LevelDebug, "Database query executed",
+		slog.String("query_type", "get_product_by_id"),
+		slog.String("product_id", productID),
+		slog.Float64("duration_seconds", duration),
+	)
 
 	return parseProductRow(id, name, description, picture, currencyCode, categoriesStr, units, nanos), nil
 }
@@ -417,15 +527,37 @@ func (p *productCatalog) Watch(req *healthpb.HealthCheckRequest, ws healthpb.Hea
 func (p *productCatalog) ListProducts(ctx context.Context, req *pb.Empty) (*pb.ListProductsResponse, error) {
 	span := trace.SpanFromContext(ctx)
 
+	// Track catalog operation
+	catalogMetrics.ProductCatalogOpsTotal.Add(ctx, 1, metric.WithAttributes(
+		attribute.String("operation", "list"),
+	))
+
+	logger.LogAttrs(
+		ctx,
+		slog.LevelInfo, "Listing all products",
+	)
+
 	products, err := loadProductsFromDB(ctx)
 	if err != nil {
 		span.SetStatus(otelcodes.Error, err.Error())
+		logger.LogAttrs(
+			ctx,
+			slog.LevelError, "Failed to load products from database",
+			slog.String("error", err.Error()),
+		)
 		return nil, status.Errorf(codes.Internal, "failed to load products: %v", err)
 	}
 
 	span.SetAttributes(
 		attribute.Int("app.products.count", len(products)),
 	)
+
+	logger.LogAttrs(
+		ctx,
+		slog.LevelInfo, "Products listed successfully",
+		slog.Int("product_count", len(products)),
+	)
+
 	return &pb.ListProductsResponse{Products: products}, nil
 }
 
@@ -435,11 +567,33 @@ func (p *productCatalog) GetProduct(ctx context.Context, req *pb.GetProductReque
 		attribute.String("app.product.id", req.Id),
 	)
 
+	// Track catalog operation and product view
+	catalogMetrics.ProductCatalogOpsTotal.Add(ctx, 1, metric.WithAttributes(
+		attribute.String("operation", "get"),
+	))
+	catalogMetrics.ProductViewsTotal.Add(ctx, 1, metric.WithAttributes(
+		attribute.String("product_id", req.Id),
+	))
+
+	logger.LogAttrs(
+		ctx,
+		slog.LevelInfo, "Product requested",
+		slog.String("product_id", req.Id),
+	)
+
 	// GetProduct will fail on a specific product when feature flag is enabled
 	if p.checkProductFailure(ctx, req.Id) {
 		msg := "Error: Product Catalog Fail Feature Flag Enabled"
 		span.SetStatus(otelcodes.Error, msg)
 		span.AddEvent(msg)
+
+		logger.LogAttrs(
+			ctx,
+			slog.LevelError, "Product catalog failure triggered by feature flag",
+			slog.String("product_id", req.Id),
+			slog.String("flag_name", "productCatalogFailure"),
+		)
+
 		return nil, status.Errorf(codes.Internal, msg)
 	}
 
@@ -448,6 +602,14 @@ func (p *productCatalog) GetProduct(ctx context.Context, req *pb.GetProductReque
 		msg := fmt.Sprintf("Product Not Found: %s", req.Id)
 		span.SetStatus(otelcodes.Error, msg)
 		span.AddEvent(msg)
+
+		logger.LogAttrs(
+			ctx,
+			slog.LevelWarn, "Product not found",
+			slog.String("product_id", req.Id),
+			slog.String("error", err.Error()),
+		)
+
 		return nil, status.Errorf(codes.NotFound, msg)
 	}
 
@@ -459,9 +621,10 @@ func (p *productCatalog) GetProduct(ctx context.Context, req *pb.GetProductReque
 
 	logger.LogAttrs(
 		ctx,
-		slog.LevelInfo, "Product Found",
-		slog.String("app.product.name", found.Name),
-		slog.String("app.product.id", req.Id),
+		slog.LevelInfo, "Product found and returned",
+		slog.String("product_name", found.Name),
+		slog.String("product_id", req.Id),
+		slog.String("category", found.Categories[0]),
 	)
 
 	return found, nil
@@ -470,15 +633,41 @@ func (p *productCatalog) GetProduct(ctx context.Context, req *pb.GetProductReque
 func (p *productCatalog) SearchProducts(ctx context.Context, req *pb.SearchProductsRequest) (*pb.SearchProductsResponse, error) {
 	span := trace.SpanFromContext(ctx)
 
+	// Track search operations
+	catalogMetrics.ProductCatalogOpsTotal.Add(ctx, 1, metric.WithAttributes(
+		attribute.String("operation", "search"),
+	))
+	catalogMetrics.ProductSearchesTotal.Add(ctx, 1)
+
+	logger.LogAttrs(
+		ctx,
+		slog.LevelInfo, "Product search requested",
+		slog.String("query", req.Query),
+	)
+
 	result, err := searchProductsFromDB(ctx, req.Query)
 	if err != nil {
 		span.SetStatus(otelcodes.Error, err.Error())
+		logger.LogAttrs(
+			ctx,
+			slog.LevelError, "Product search failed",
+			slog.String("query", req.Query),
+			slog.String("error", err.Error()),
+		)
 		return nil, status.Errorf(codes.Internal, "failed to search products: %v", err)
 	}
 
 	span.SetAttributes(
 		attribute.Int("app.products_search.count", len(result)),
 	)
+
+	logger.LogAttrs(
+		ctx,
+		slog.LevelInfo, "Product search completed",
+		slog.String("query", req.Query),
+		slog.Int("results_count", len(result)),
+	)
+
 	return &pb.SearchProductsResponse{Results: result}, nil
 }
 
@@ -491,5 +680,22 @@ func (p *productCatalog) checkProductFailure(ctx context.Context, id string) boo
 	failureEnabled, _ := client.BooleanValue(
 		ctx, "productCatalogFailure", false, openfeature.EvaluationContext{},
 	)
+
+	// Track feature flag evaluation
+	catalogMetrics.FeatureFlagEvaluations.Add(ctx, 1, metric.WithAttributes(
+		attribute.String("flag_name", "productCatalogFailure"),
+		attribute.Bool("value", failureEnabled),
+	))
+
+	if failureEnabled {
+		logger.LogAttrs(
+			ctx,
+			slog.LevelWarn, "Feature flag evaluated: product catalog failure enabled",
+			slog.String("flag_name", "productCatalogFailure"),
+			slog.String("product_id", id),
+			slog.Bool("enabled", failureEnabled),
+		)
+	}
+
 	return failureEnabled
 }
