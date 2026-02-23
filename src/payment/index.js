@@ -7,26 +7,43 @@ const opentelemetry = require('@opentelemetry/api')
 
 const charge = require('./charge')
 const logger = require('./logger')
+const paymentMetrics = require('./metrics')
 
 async function chargeServiceHandler(call, callback) {
   const span = opentelemetry.trace.getActiveSpan();
+  
+  // Track active connection
+  paymentMetrics.activeConnections.add(1);
 
   try {
     const amount = call.request.amount
+    const amountValue = parseFloat(`${amount.units}.${amount.nanos}`).toFixed(2);
+    
     span?.setAttributes({
-      'app.payment.amount': parseFloat(`${amount.units}.${amount.nanos}`).toFixed(2)
+      'app.payment.amount': amountValue
     })
-    logger.info({ request: call.request }, "Charge request received.")
+    
+    logger.info({
+      msg: 'Charge request received',
+      amount: amountValue,
+      currency: amount.currencyCode,
+    });
 
     const response = await charge.charge(call.request)
+    
+    logger.info({
+      msg: 'Charge request completed successfully',
+      transaction_id: response.transactionId,
+    });
+    
     callback(null, response)
 
   } catch (err) {
-    logger.warn({ err })
-
-    span?.recordException(err)
     span?.setStatus({ code: opentelemetry.SpanStatusCode.ERROR })
     callback(err)
+  } finally {
+    // Track connection closed
+    paymentMetrics.activeConnections.add(-1);
   }
 }
 

@@ -14,9 +14,10 @@ RUN go mod download
 COPY ./src/checkout/genproto/oteldemo/ genproto/oteldemo/
 COPY ./src/checkout/kafka/ kafka/
 COPY ./src/checkout/money/ money/
+COPY ./src/checkout/metrics.go metrics.go
 COPY ./src/checkout/main.go main.go
 
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags "-s -w" -o checkout main.go
+RUN CGO_ENABLED=0 GOOS=linux GO111MODULE=on go build -ldflags "-s -w" -o checkout .
 
 FROM gcr.io/distroless/static-debian12:nonroot
 

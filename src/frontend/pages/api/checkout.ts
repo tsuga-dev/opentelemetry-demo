@@ -7,14 +7,23 @@ import CheckoutGateway from '../../gateways/rpc/Checkout.gateway';
 import { Empty, PlaceOrderRequest } from '../../protos/demo';
 import { IProductCheckoutItem, IProductCheckout } from '../../types/Cart';
 import ProductCatalogService from '../../services/ProductCatalog.service';
+import { metrics } from '../../utils/telemetry/metrics';
+import logger from '../../utils/telemetry/logger';
 
 type TResponse = IProductCheckout | Empty;
 
 const handler = async ({ method, body, query }: NextApiRequest, res: NextApiResponse<TResponse>) => {
   switch (method) {
     case 'POST': {
+      const startTime = Date.now();
       const { currencyCode = '' } = query;
       const orderData = body as PlaceOrderRequest;
+
+      logger.info({ 
+        event: 'checkout_initiated',
+        currency: currencyCode as string,
+      }, 'Checkout process initiated');
+
       const { order: { items = [], ...order } = {} } = await CheckoutGateway.placeOrder(orderData);
 
       const productList: IProductCheckoutItem[] = await Promise.all(
@@ -31,6 +40,24 @@ const handler = async ({ method, body, query }: NextApiRequest, res: NextApiResp
           };
         })
       );
+
+      const duration = Date.now() - startTime;
+      metrics.checkoutDuration.record(duration, {
+        currency: currencyCode as string,
+        status: 'success',
+      });
+      metrics.checkoutAttempts.add(1, {
+        status: 'success',
+        currency: currencyCode as string,
+      });
+
+      logger.info({
+        event: 'checkout_completed',
+        orderId: 'orderId' in order ? order.orderId : '',
+        currency: currencyCode as string,
+        itemCount: productList.length,
+        durationMs: duration,
+      }, 'Checkout completed successfully');
 
       return res.status(200).json({ ...order, items: productList });
     }

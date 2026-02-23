@@ -5,14 +5,35 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import InstrumentationMiddleware from '../../utils/telemetry/InstrumentationMiddleware';
 import AdGateway from '../../gateways/rpc/Ad.gateway';
 import { Ad, Empty } from '../../protos/demo';
+import { metrics } from '../../utils/telemetry/metrics';
+import logger from '../../utils/telemetry/logger';
 
 type TResponse = Ad[] | Empty;
 
 const handler = async ({ method, query }: NextApiRequest, res: NextApiResponse<TResponse>) => {
   switch (method) {
     case 'GET': {
+      const startTime = Date.now();
       const { contextKeys = [] } = query;
-      const { ads: adList } = await AdGateway.listAds(Array.isArray(contextKeys) ? contextKeys : contextKeys.split(','));
+
+      const contextArray = Array.isArray(contextKeys) ? contextKeys : contextKeys.split(',');
+
+      logger.info({
+        event: 'ads_requested',
+        contextKeyCount: contextArray.length,
+      }, 'Requesting contextual ads');
+
+      const { ads: adList } = await AdGateway.listAds(contextArray);
+
+      const duration = Date.now() - startTime;
+      metrics.adsServed.add(adList.length);
+
+      logger.info({
+        event: 'ads_served',
+        adCount: adList.length,
+        contextKeyCount: contextArray.length,
+        durationMs: duration,
+      }, 'Ads served successfully');
 
       return res.status(200).json(adList);
     }
