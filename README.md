@@ -61,20 +61,20 @@ keeping it up to date for you.
 
 |                           |                |                                  |
 |---------------------------|----------------|----------------------------------|
-| [AlibabaCloud LogService] | [Google Cloud] | [Parseable]                      |
-| [Apache Doris]            | [Grafana Labs] | [Sentry]                         |
-| [AppDynamics]             | [Guance]       | [ServiceNow Cloud Observability] |
-| [Aspecto]                 | [Honeycomb.io] | [SigNoz]                         |
-| [Axiom]                   | [Instana]      | [Splunk]                         |
-| [Axoflow]                 | [Kloudfuse]    | [Sumo Logic]                     |
-| [Azure Data Explorer]     | [Last9]        | [TelemetryHub]                   |
-| [Causely]                 | [Liatrio]      | [Teletrace]                      |
-| [ClickStack]              | [Logz.io]      | [Tinybird]                       |
-| [Coralogix]               | [New Relic]    | [Tracetest]                      |
-| [Dash0]                   | [Oodle]        | [Tsuga]                          |
-| [Datadog]                 | [OpenObserve]  | [Uptrace]                        |
-| [Dynatrace]               | [OpenSearch]   | [VictoriaMetrics]                |
-| [Elastic]                 | [Oracle]       |                                  |
+| [AlibabaCloud LogService] | [Google Cloud] | [Oracle]                         |
+| [Apache Doris]            | [Grafana Labs] | [Parseable]                      |
+| [AppDynamics]             | [Guance]       | [Sentry]                         |
+| [Aspecto]                 | [Honeycomb.io] | [ServiceNow Cloud Observability] |
+| [Axiom]                   | [Instana]      | [SigNoz]                         |
+| [Axoflow]                 | [Kloudfuse]    | [Splunk]                         |
+| [Azure Data Explorer]     | [Kopai]        | [Sumo Logic]                     |
+| [Causely]                 | [Last9]        | [TelemetryHub]                   |
+| [ClickStack]              | [Liatrio]      | [Teletrace]                      |
+| [Coralogix]               | [Logz.io]      | [Tinybird]                       |
+| [Dash0]                   | [New Relic]    | [Tracetest]                      |
+| [Datadog]                 | [Oodle]        | [Tsuga]                          |
+| [Dynatrace]               | [OpenObserve]  | [Uptrace]                        |
+| [Elastic]                 | [OpenSearch]   | [VictoriaMetrics]                |
 
 ## Contributing
 
