@@ -100,7 +100,8 @@ def get_product_list(request_product_ids):
             span.set_attribute("app.cache_hit", False)
             span.set_attribute("app.cache_miss_reason", "stale_or_first_run")
             logger.info("get_product_list: cache miss")
-            product_ids = fetch_product_list()
+            cached_ids = fetch_product_list()
+            product_ids = cached_ids
         # Cache hit: use cached values
         else:
             span.set_attribute("app.recommendation.cache_enabled", True)
