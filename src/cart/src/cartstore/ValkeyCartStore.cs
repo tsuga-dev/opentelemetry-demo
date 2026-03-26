@@ -157,18 +157,18 @@ public class ValkeyCartStore : ICartStore
             return await operation(db);
         }
 
-        Interlocked.Increment(ref _poolWaiting);
+        int waiting = Interlocked.Increment(ref _poolWaiting);
         activity?.SetTag("db.pool.size", PoolSize);
-        activity?.SetTag("db.pool.waiting", _poolWaiting);
+        activity?.SetTag("db.pool.waiting", waiting);
 
         bool acquired = await _connectionSlot.WaitAsync(TimeSpan.FromSeconds(5));
-        Interlocked.Decrement(ref _poolWaiting);
+        int waitingAtTimeout = Interlocked.Decrement(ref _poolWaiting) + 1;
 
         if (!acquired)
         {
             _logger.LogWarning(
                 "Valkey connection pool exhausted: pool_size={PoolSize} pool_waiting={Waiting} — connection slot not available after 5s timeout",
-                PoolSize, _poolWaiting);
+                PoolSize, waitingAtTimeout);
             activity?.SetTag("db.pool.exhausted", true);
             throw new TimeoutException("Valkey connection pool exhausted");
         }
@@ -199,37 +199,35 @@ public class ValkeyCartStore : ICartStore
         {
             EnsureRedisConnected();
 
-            // Access the cart from the cache
-            var value = await ExecuteWithPoolSimulationAsync(
-                async db => await db.HashGetAsync(userId, CartFieldName),
-                Activity.Current);
-
-            Oteldemo.Cart cart;
-            if (value.IsNull)
-            {
-                cart = new Oteldemo.Cart
-                {
-                    UserId = userId
-                };
-                cart.Items.Add(new Oteldemo.CartItem { ProductId = productId, Quantity = quantity });
-            }
-            else
-            {
-                cart = Oteldemo.Cart.Parser.ParseFrom(value);
-                var existingItem = cart.Items.SingleOrDefault(i => i.ProductId == productId);
-                if (existingItem == null)
-                {
-                    cart.Items.Add(new Oteldemo.CartItem { ProductId = productId, Quantity = quantity });
-                }
-                else
-                {
-                    existingItem.Quantity += quantity;
-                }
-            }
-
+            // Access the cart from the cache and write the updated cart in a single pool acquisition
             await ExecuteWithPoolSimulationAsync(
                 async db =>
                 {
+                    var value = await db.HashGetAsync(userId, CartFieldName);
+
+                    Oteldemo.Cart cart;
+                    if (value.IsNull)
+                    {
+                        cart = new Oteldemo.Cart
+                        {
+                            UserId = userId
+                        };
+                        cart.Items.Add(new Oteldemo.CartItem { ProductId = productId, Quantity = quantity });
+                    }
+                    else
+                    {
+                        cart = Oteldemo.Cart.Parser.ParseFrom(value);
+                        var existingItem = cart.Items.SingleOrDefault(i => i.ProductId == productId);
+                        if (existingItem == null)
+                        {
+                            cart.Items.Add(new Oteldemo.CartItem { ProductId = productId, Quantity = quantity });
+                        }
+                        else
+                        {
+                            existingItem.Quantity += quantity;
+                        }
+                    }
+
                     await db.HashSetAsync(userId, new[]{ new HashEntry(CartFieldName, cart.ToByteArray()) });
                     await db.KeyExpireAsync(userId, TimeSpan.FromMinutes(60));
                     return true;
