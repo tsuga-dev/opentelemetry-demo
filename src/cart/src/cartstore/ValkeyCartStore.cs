@@ -147,7 +147,7 @@ public class ValkeyCartStore : ICartStore
         }
     }
 
-    private async Task<T> ExecuteWithPoolSimulationAsync<T>(Func<IDatabase, Task<T>> operation, Activity? activity)
+    private async Task<T> ExecuteWithPoolSimulationAsync<T>(Func<IDatabase, Task<T>> operation, Activity activity)
     {
         bool exhaustionEnabled = await _featureClient.GetBooleanValueAsync("valkeyConnectionExhaustion", false);
 
