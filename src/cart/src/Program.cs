@@ -41,7 +41,7 @@ builder.Logging
 
 builder.Services.AddSingleton<ICartStore>(x =>
 {
-    var store = new ValkeyCartStore(x.GetRequiredService<ILogger<ValkeyCartStore>>(), valkeyAddress);
+    var store = new ValkeyCartStore(x.GetRequiredService<ILogger<ValkeyCartStore>>(), valkeyAddress, x.GetRequiredService<IFeatureClient>());
     store.Initialize();
     return store;
 });
@@ -57,7 +57,7 @@ builder.Services.AddOpenFeature(openFeatureBuilder =>
 builder.Services.AddSingleton(x =>
     new CartService(
         x.GetRequiredService<ICartStore>(),
-        new ValkeyCartStore(x.GetRequiredService<ILogger<ValkeyCartStore>>(), "badhost:1234"),
+        new ValkeyCartStore(x.GetRequiredService<ILogger<ValkeyCartStore>>(), "badhost:1234", x.GetRequiredService<IFeatureClient>()),
         x.GetRequiredService<IFeatureClient>()
 ));
 
@@ -80,6 +80,7 @@ builder.Services.AddOpenTelemetry()
         .AddOtlpExporter())
     .WithMetrics(meterBuilder => meterBuilder
         .AddMeter("OpenTelemetry.Demo.Cart")
+        .AddMeter("OpenTelemetry.Demo.CartStore")
         .AddMeter("OpenFeature")
         .AddProcessInstrumentation()
         .AddRuntimeInstrumentation()
