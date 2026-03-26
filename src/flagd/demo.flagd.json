@@ -87,8 +87,8 @@
       "description": "Simulate silent fraud detection failure: service logs a classifier model error internally but continues consuming messages, resulting in 0% fraud detection rate with no visible crash",
       "state": "ENABLED",
       "variants": {
-        "off": false,
-        "on": true
+        "off": 0,
+        "on": 1
       }
     },
     "cartFailure": {
