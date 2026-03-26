@@ -123,6 +123,15 @@
       },
       "defaultVariant": "off"
     },
+    "traceContextDrop": {
+      "defaultVariant": "off",
+      "description": "Drop W3C trace context propagation on the payment charge call, causing the payment service span to appear as a disconnected root trace in the observability backend",
+      "state": "ENABLED",
+      "variants": {
+        "off": false,
+        "on": true
+      }
+    },
     "loadGeneratorFloodHomepage": {
       "description": "Flood the frontend with a large amount of requests.",
       "state": "ENABLED",
