@@ -82,6 +82,15 @@
       },
       "defaultVariant": "off"
     },
+    "valkeyConnectionExhaustion": {
+      "defaultVariant": "off",
+      "description": "Simulate Valkey connection pool exhaustion by limiting pool to 1 connection with artificial delay, causing cart operations to queue and timeout",
+      "state": "ENABLED",
+      "variants": {
+        "off": false,
+        "on": true
+      }
+    },
     "paymentFailure": {
       "description": "Fail payment service charge requests n%",
       "state": "ENABLED",
