@@ -88,6 +88,10 @@ internal class Consumer : IDisposable
         try
         {
             var order = OrderResult.Parser.ParseFrom(message.Value);
+            var publishedAt = message.Timestamp.UtcDateTime;
+            var consumedAt = DateTime.UtcNow;
+            var deltaSeconds = (consumedAt - publishedAt).TotalSeconds;
+            Log.KafkaMessageTiming(_logger, order.OrderId, publishedAt, consumedAt, deltaSeconds);
             Log.OrderReceivedMessage(_logger, order);
 
             if (_dbConnectionString == null)
