@@ -16,3 +16,19 @@
 #    pipelines:
 #      traces:
 #        exporters: [spanmetrics, otlp_http/example]
+
+exporters:
+  otlphttp/tsuga:
+    endpoint: ${env:TSUGA_ENDPOINT}
+    compression: gzip
+    headers:
+      Authorization: "Bearer ${env:TSUGA_API_KEY}"
+
+service:
+  pipelines:
+    traces:
+      exporters: [spanmetrics, otlphttp/tsuga]
+    metrics:
+      exporters: [otlphttp/tsuga]
+    logs:
+      exporters: [otlphttp/tsuga]
