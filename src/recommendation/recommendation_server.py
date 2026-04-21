@@ -64,6 +64,12 @@ class RecommendationService(demo_pb2_grpc.RecommendationServiceServicer):
             status=health_pb2.HealthCheckResponse.UNIMPLEMENTED)
 
 
+def fetch_product_list():
+    """Fetch the full product list from the product catalog gRPC stub."""
+    cat_response = product_catalog_stub.ListProducts(demo_pb2.Empty())
+    return [x.id for x in cat_response.products]
+
+
 def get_product_list(request_product_ids):
     global first_run
     global cached_ids
@@ -74,26 +80,35 @@ def get_product_list(request_product_ids):
         request_product_ids_str = ''.join(request_product_ids)
         request_product_ids = request_product_ids_str.split(',')
 
-        # Feature flag scenario - Cache Leak
-        if check_feature_flag("recommendationCacheFailure"):
-            span.set_attribute("app.recommendation.cache_enabled", True)
-            if random.random() < 0.5 or first_run:
-                first_run = False
-                span.set_attribute("app.cache_hit", False)
-                logger.info("get_product_list: cache miss")
-                cat_response = product_catalog_stub.GetProduct(demo_pb2.Empty())
-                response_ids = [x.id for x in cat_response.products]
-                cached_ids = cached_ids + response_ids
-                cached_ids = cached_ids + cached_ids[:len(cached_ids) // 4]
-                product_ids = cached_ids
-            else:
-                span.set_attribute("app.cache_hit", True)
-                logger.info("get_product_list: cache hit")
-                product_ids = cached_ids
-        else:
+        cache_failure_flag = check_feature_flag("recommendationCacheFailure")
+
+        # Feature flag scenario - Cache Leak: cache is disabled, always fetch fresh
+        if cache_failure_flag:
             span.set_attribute("app.recommendation.cache_enabled", False)
-            cat_response = product_catalog_stub.ListProducts(demo_pb2.Empty())
-            product_ids = [x.id for x in cat_response.products]
+            span.set_attribute("app.cache_hit", False)
+            span.set_attribute("app.cache_miss_reason", "feature_flag")
+            logger.info("get_product_list: cache disabled by feature flag")
+            cat_response = product_catalog_stub.GetProduct(demo_pb2.Empty())
+            response_ids = [x.id for x in cat_response.products]
+            cached_ids = cached_ids + response_ids
+            cached_ids = cached_ids + cached_ids[:len(cached_ids) // 4]
+            product_ids = cached_ids
+        # Normal cache miss: random chance or first run
+        elif random.random() < 0.5 or first_run:
+            first_run = False
+            span.set_attribute("app.recommendation.cache_enabled", True)
+            span.set_attribute("app.cache_hit", False)
+            span.set_attribute("app.cache_miss_reason", "stale_or_first_run")
+            logger.info("get_product_list: cache miss")
+            cached_ids = fetch_product_list()
+            product_ids = cached_ids
+        # Cache hit: use cached values
+        else:
+            span.set_attribute("app.recommendation.cache_enabled", True)
+            span.set_attribute("app.cache_hit", True)
+            span.set_attribute("app.cache_miss_reason", "")
+            logger.info("get_product_list: cache hit")
+            product_ids = cached_ids
 
         span.set_attribute("app.products.count", len(product_ids))
 
