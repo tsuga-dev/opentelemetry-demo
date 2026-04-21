@@ -62,6 +62,14 @@ fun main() {
                         Thread.sleep(1000)
                     }
                     val orders = OrderResult.parseFrom(record.value())
+                    val fraudSilentFailEnabled = getFeatureFlagValue("fraudSilentFail") != 0
+                    if (fraudSilentFailEnabled) {
+                        logger.error(
+                            "FRAUD_DETECTION_ENGINE_ERROR: classifier model unavailable, skipping order validation for orderId={}. All orders defaulting to approved status.",
+                            orders.orderId
+                        )
+                        return@fold accumulator
+                    }
                     logger.info("Consumed record with orderId: ${orders.orderId}, and updated total count to: $newCount")
                     newCount
                 }
