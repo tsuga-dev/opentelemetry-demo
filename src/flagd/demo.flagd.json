@@ -132,7 +132,6 @@
         "off": false
       },
       "defaultVariant": "off"
-
     },
     "emailMemoryLeak": {
       "description": "Memory leak in the email service.",
@@ -146,6 +145,15 @@
         "10000x": 10000
       },
       "defaultVariant": "off"
+    },
+    "traceContextDrop": {
+      "defaultVariant": "off",
+      "description": "Drop W3C trace context propagation on the payment charge call, causing the payment service span to appear as a disconnected root trace in the observability backend",
+      "state": "ENABLED",
+      "variants": {
+        "off": false,
+        "on": true
+      }
     }
   }
 }
