@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 using System;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Grpc.Core;
 using StackExchange.Redis;
@@ -9,6 +10,7 @@ using Google.Protobuf;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics.Metrics;
 using System.Diagnostics;
+using OpenFeature;
 
 namespace cart.cartstore;
 
@@ -43,8 +45,24 @@ public class ValkeyCartStore : ICartStore
         });
     private readonly ConfigurationOptions _redisConnectionOptions;
 
-    public ValkeyCartStore(ILogger<ValkeyCartStore> logger, string valkeyAddress)
+    private readonly SemaphoreSlim _connectionSlot = new SemaphoreSlim(1, 1);
+    private int _poolWaiting = 0;
+    private const int PoolSize = 1;
+    private readonly IFeatureClient _featureClient;
+
+    private readonly Meter _cartStoreMeter;
+    private readonly ObservableGauge<int> _poolSizeGauge;
+    private readonly ObservableGauge<int> _poolActiveGauge;
+    private readonly ObservableGauge<int> _poolWaitingGauge;
+
+    public ValkeyCartStore(ILogger<ValkeyCartStore> logger, string valkeyAddress, IFeatureClient featureClient)
     {
+        _featureClient = featureClient;
+        _cartStoreMeter = new Meter("OpenTelemetry.Demo.CartStore");
+        _poolSizeGauge = _cartStoreMeter.CreateObservableGauge("db.pool.size", () => PoolSize, "connections", "Simulated connection pool size");
+        _poolActiveGauge = _cartStoreMeter.CreateObservableGauge("db.pool.active", () => PoolSize - _connectionSlot.CurrentCount, "connections", "Active connections");
+        _poolWaitingGauge = _cartStoreMeter.CreateObservableGauge("db.pool.waiting", () => _poolWaiting, "connections", "Connections waiting for pool slot");
+
         _logger = logger;
         // Serialize empty cart into byte array.
         var cart = new Oteldemo.Cart();
@@ -129,6 +147,45 @@ public class ValkeyCartStore : ICartStore
         }
     }
 
+    private async Task<T> ExecuteWithPoolSimulationAsync<T>(Func<IDatabase, Task<T>> operation, Activity activity)
+    {
+        bool exhaustionEnabled = await _featureClient.GetBooleanValueAsync("valkeyConnectionExhaustion", false);
+
+        if (!exhaustionEnabled)
+        {
+            var db = GetConnection().GetDatabase();
+            return await operation(db);
+        }
+
+        int waiting = Interlocked.Increment(ref _poolWaiting);
+        activity?.SetTag("db.pool.size", PoolSize);
+        activity?.SetTag("db.pool.waiting", waiting);
+
+        bool acquired = await _connectionSlot.WaitAsync(TimeSpan.FromSeconds(5));
+        int waitingAtTimeout = Interlocked.Decrement(ref _poolWaiting) + 1;
+
+        if (!acquired)
+        {
+            _logger.LogWarning(
+                "Valkey connection pool exhausted: pool_size={PoolSize} pool_waiting={Waiting} — connection slot not available after 5s timeout",
+                PoolSize, waitingAtTimeout);
+            activity?.SetTag("db.pool.exhausted", true);
+            throw new TimeoutException("Valkey connection pool exhausted");
+        }
+
+        try
+        {
+            activity?.SetTag("db.pool.active", PoolSize - _connectionSlot.CurrentCount);
+            await Task.Delay(2000);
+            var db = GetConnection().GetDatabase();
+            return await operation(db);
+        }
+        finally
+        {
+            _connectionSlot.Release();
+        }
+    }
+
     public async Task AddItemAsync(string userId, string productId, int quantity)
     {
         var stopwatch = Stopwatch.StartNew();
@@ -142,36 +199,40 @@ public class ValkeyCartStore : ICartStore
         {
             EnsureRedisConnected();
 
-            var db = _redis.GetDatabase();
-
-            // Access the cart from the cache
-            var value = await db.HashGetAsync(userId, CartFieldName);
-
-            Oteldemo.Cart cart;
-            if (value.IsNull)
-            {
-                cart = new Oteldemo.Cart
+            // Access the cart from the cache and write the updated cart in a single pool acquisition
+            await ExecuteWithPoolSimulationAsync(
+                async db =>
                 {
-                    UserId = userId
-                };
-                cart.Items.Add(new Oteldemo.CartItem { ProductId = productId, Quantity = quantity });
-            }
-            else
-            {
-                cart = Oteldemo.Cart.Parser.ParseFrom(value);
-                var existingItem = cart.Items.SingleOrDefault(i => i.ProductId == productId);
-                if (existingItem == null)
-                {
-                    cart.Items.Add(new Oteldemo.CartItem { ProductId = productId, Quantity = quantity });
-                }
-                else
-                {
-                    existingItem.Quantity += quantity;
-                }
-            }
+                    var value = await db.HashGetAsync(userId, CartFieldName);
 
-            await db.HashSetAsync(userId, new[]{ new HashEntry(CartFieldName, cart.ToByteArray()) });
-            await db.KeyExpireAsync(userId, TimeSpan.FromMinutes(60));
+                    Oteldemo.Cart cart;
+                    if (value.IsNull)
+                    {
+                        cart = new Oteldemo.Cart
+                        {
+                            UserId = userId
+                        };
+                        cart.Items.Add(new Oteldemo.CartItem { ProductId = productId, Quantity = quantity });
+                    }
+                    else
+                    {
+                        cart = Oteldemo.Cart.Parser.ParseFrom(value);
+                        var existingItem = cart.Items.SingleOrDefault(i => i.ProductId == productId);
+                        if (existingItem == null)
+                        {
+                            cart.Items.Add(new Oteldemo.CartItem { ProductId = productId, Quantity = quantity });
+                        }
+                        else
+                        {
+                            existingItem.Quantity += quantity;
+                        }
+                    }
+
+                    await db.HashSetAsync(userId, new[]{ new HashEntry(CartFieldName, cart.ToByteArray()) });
+                    await db.KeyExpireAsync(userId, TimeSpan.FromMinutes(60));
+                    return true;
+                },
+                Activity.Current);
         }
         catch (Exception ex)
         {
@@ -192,11 +253,16 @@ public class ValkeyCartStore : ICartStore
         try
         {
             EnsureRedisConnected();
-            var db = _redis.GetDatabase();
 
             // Update the cache with empty cart for given user
-            await db.HashSetAsync(userId, new[] { new HashEntry(CartFieldName, _emptyCartBytes) });
-            await db.KeyExpireAsync(userId, TimeSpan.FromMinutes(60));
+            await ExecuteWithPoolSimulationAsync(
+                async db =>
+                {
+                    await db.HashSetAsync(userId, new[] { new HashEntry(CartFieldName, _emptyCartBytes) });
+                    await db.KeyExpireAsync(userId, TimeSpan.FromMinutes(60));
+                    return true;
+                },
+                Activity.Current);
         }
         catch (Exception ex)
         {
@@ -217,10 +283,10 @@ public class ValkeyCartStore : ICartStore
         {
             EnsureRedisConnected();
 
-            var db = _redis.GetDatabase();
-
             // Access the cart from the cache
-            var value = await db.HashGetAsync(userId, CartFieldName);
+            var value = await ExecuteWithPoolSimulationAsync(
+                async db => await db.HashGetAsync(userId, CartFieldName),
+                Activity.Current);
 
             if (!value.IsNull)
             {

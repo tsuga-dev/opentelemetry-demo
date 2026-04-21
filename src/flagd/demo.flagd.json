@@ -132,7 +132,6 @@
         "off": false
       },
       "defaultVariant": "off"
-
     },
     "emailMemoryLeak": {
       "description": "Memory leak in the email service.",
@@ -146,6 +145,15 @@
         "10000x": 10000
       },
       "defaultVariant": "off"
+    },
+    "valkeyConnectionExhaustion": {
+      "defaultVariant": "off",
+      "description": "Simulate Valkey connection pool exhaustion by limiting pool to 1 connection with artificial delay, causing cart operations to queue and timeout",
+      "state": "ENABLED",
+      "variants": {
+        "off": false,
+        "on": true
+      }
     }
   }
 }
