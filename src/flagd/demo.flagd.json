@@ -132,7 +132,6 @@
         "off": false
       },
       "defaultVariant": "off"
-
     },
     "emailMemoryLeak": {
       "description": "Memory leak in the email service.",
@@ -146,6 +145,15 @@
         "10000x": 10000
       },
       "defaultVariant": "off"
+    },
+    "productCatalogNPlusOne": {
+      "defaultVariant": "off",
+      "description": "Simulate N+1 query anti-pattern: ListProducts makes one individual GetProduct call per product instead of a single batch query, creating N child spans per request",
+      "state": "ENABLED",
+      "variants": {
+        "off": false,
+        "on": true
+      }
     }
   }
 }

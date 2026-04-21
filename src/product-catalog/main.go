@@ -344,6 +344,33 @@ func (p *productCatalog) ListProducts(ctx context.Context, req *pb.Empty) (*pb.L
 		return nil, status.Errorf(codes.Internal, "failed to load products: %v", err)
 	}
 
+	client := openfeature.NewClient("productCatalog")
+	nPlusOneEnabled, _ := client.BooleanValue(
+		ctx, "productCatalogNPlusOne", false, openfeature.EvaluationContext{},
+	)
+
+	if nPlusOneEnabled {
+		// N+1 anti-pattern: re-fetch each product individually instead of using the batch result
+		refetched := make([]*pb.Product, 0, len(products))
+		for _, product := range products {
+			fetched, err := p.GetProduct(ctx, &pb.GetProductRequest{Id: product.Id})
+			if err != nil {
+				span.SetStatus(otelcodes.Error, err.Error())
+				return nil, status.Errorf(codes.Internal, "failed to get product %s: %v", product.Id, err)
+			}
+			refetched = append(refetched, fetched)
+		}
+		products = refetched
+		span.SetAttributes(
+			attribute.String("app.query_pattern", "n+1"),
+			attribute.Int("app.products.fetched_individually", len(products)),
+		)
+	} else {
+		span.SetAttributes(
+			attribute.String("app.query_pattern", "batch"),
+		)
+	}
+
 	span.SetAttributes(
 		attribute.Int("app.products.count", len(products)),
 	)
