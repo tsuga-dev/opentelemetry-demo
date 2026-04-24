@@ -7,6 +7,20 @@ the release.
 
 ## Unreleased
 
+* [docker] Podman doesn't support the tag feature of docker logs,
+  for the otel-demo to support podman we need to remove the tag from docker logs.
+  [#3304](https://github.com/open-telemetry/opentelemetry-demo/pull/3304)
+* [payment] Fix `charge` span lifecycle and exception attribution: wrap charge
+  logic in `try/catch/finally` to ensure the span is always ended, record
+  exceptions on the `charge` span where they originate, and remove duplicate
+  `recordException` from the gRPC handler
+  ([#3276](https://github.com/open-telemetry/opentelemetry-demo/pull/3276))
+* [recommendation] Fix `recommendationCacheFailure` feature flag by
+  using `ListProducts` instead of `GetProduct`
+  ([#3260](https://github.com/open-telemetry/opentelemetry-demo/pull/3260))
+* [telemetry-docs] Add a new service to provide telemetry documentation based
+  on Weaver
+  ([#2794](https://github.com/open-telemetry/opentelemetry-demo/pull/2794))
 * [accounting] fix memory leak with dbcontext
   ([#2876](https://github.com/open-telemetry/opentelemetry-demo/pull/2876))
 * [chore] Upgrade OTel Collector to v0.145.0 with :warning: breaking change:
@@ -31,6 +45,33 @@ the release.
   180m for fraud-detection to prevent large heap size that causes
   OOMKills with k8s.
   ([#3105](https://github.com/open-telemetry/opentelemetry-demo/pull/3105))
+* [postgresql] More realistic PostgreSQL setup: replace generic `root`/`otelu` users
+  and `otel` database with dedicated `astronomy_db` owned by `astronomy_user`;
+  add `monitoring_user` with `pg_monitor` role for the OTel Collector receiver;
+  enable `pg_stat_statements` on all databases; rename Compose service and
+  container to `astronomy-db`
+  ([#3153](https://github.com/open-telemetry/opentelemetry-demo/pull/3153))
+* [product-catalog] Enrich DB spans and metrics with `server.address` and `server.port`
+  attributes extracted from the DSN via `otelsql.AttributesFromDSN`
+  ([#3154](https://github.com/open-telemetry/opentelemetry-demo/pull/3154))
+* [otelcollector] add kafkametricsreceiver
+  ([#3158](https://github.com/open-telemetry/opentelemetry-demo/pull/3158))
+* [load-generator] Wait for Roof Binoculars image to load in web tasks, and fix
+  task failures due to missing `tracer` attribute
+  ([#3171](https://github.com/open-telemetry/opentelemetry-demo/pull/3171))
+* [kubernetes] Removed generated Kubernetes manifests in favor of docs
+  ([#3236](https://github.com/open-telemetry/opentelemetry-demo/pull/3236))
+* [cart] Swap the deprecated `OpenFeature.Contrib.Providers.Flagd` package
+  provider with the new `OpenFeature.Providers.Flagd` package.
+  ([#3247](https://github.com/open-telemetry/opentelemetry-demo/pull/3247))
+* [recommendation] Fix `recommendationCacheFailure` feature flag by
+  using `ListProducts` instead of `GetProduct`
+  ([#3260](https://github.com/open-telemetry/opentelemetry-demo/pull/3260))
+* [frontend] fix: handle undefined product images across multiple components
+  ([#3291](https://github.com/open-telemetry/opentelemetry-demo/pull/3291))
+* [grafana] Bump Grafana image to 13.0.1 and provision the
+  `grafana-default-email` contact point explicitly, since Grafana no longer
+  auto-seeds it (removed in 12.4+)
 
 ## 2.2.0
 
