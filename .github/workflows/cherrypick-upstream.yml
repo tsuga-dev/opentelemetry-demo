@@ -1,7 +1,10 @@
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
-# Weekly merge of upstream open-telemetry/opentelemetry-demo into sync/upstream; opens or updates a PR.
-# Intended for forks only (see job `if`).
+# Weekly merge of upstream open-telemetry/opentelemetry-demo into a dated head branch
+# (e.g. sync/upstream-YYYY-MM-DD). Opens a draft PR before merging (same default when run locally).
+# On merge conflicts the job fails and aborts the merge; the PR receives a comment with resolution steps.
+# Optional env: CHERRYPICK_EARLY_DRAFT_PR=0,
+# CHERRYPICK_LEAVE_DRAFT_ON_SUCCESS=1. Intended for forks only (see job `if`).
 
 name: Cherry-pick upstream
 
