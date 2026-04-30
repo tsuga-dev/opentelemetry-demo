@@ -10,16 +10,15 @@ on:
     - cron: "0 6 * * 1"  # 06:00 UTC every Monday
   workflow_dispatch:
 
+# Job-level permissions cannot exceed workflow-level. pull-requests: write is required for gh pr create.
 permissions:
-  contents: read
+  contents: write
+  pull-requests: write
 
 jobs:
   sync:
     if: github.event.repository.fork
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
