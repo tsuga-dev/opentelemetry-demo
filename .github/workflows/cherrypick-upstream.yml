@@ -1,0 +1,38 @@
+# Copyright The OpenTelemetry Authors
+# SPDX-License-Identifier: Apache-2.0
+# Weekly merge of upstream open-telemetry/opentelemetry-demo into sync/upstream; opens or updates a PR.
+# Intended for forks only (see job `if`).
+
+name: Cherry-pick upstream
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"  # 06:00 UTC every Monday
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    if: github.event.repository.fork
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git author for merges
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Merge upstream and open/update PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/cherrypick-upstream.sh
