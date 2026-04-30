@@ -11,34 +11,29 @@ on:
         type: boolean
       version:
         description: The version used when tagging the image
-        default: "dev"
+        default: 'dev'
         required: false
         type: string
       dockerhub_repo:
         description: Docker Hub repository
-        default: "otel/demo"
+        default: 'otel/demo'
         required: false
         type: string
       ghcr_repo:
         description: GHCR repository
-        default: "ghcr.io/tsuga-dev/otel-demo"
+        default: 'ghcr.io/open-telemetry/demo'
         required: false
         type: string
 
 permissions:
   contents: read
-  id-token: write
-
-env:
-  AWS_REGION: "eu-central-1"
-  ECR_REPOSITORY: "tsuga-dev/otel-demo"
 
 jobs:
   protobufcheck:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
       - name: Generate
         run: make clean docker-generate-protobuf
       - name: Check Clean Work Tree
@@ -51,7 +46,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-      id-token: write
 
     env:
       RELEASE_VERSION: "${{ github.event.release.tag_name }}"
@@ -148,13 +142,17 @@ jobs:
             tag_suffix: shipping
             context: ./
             setup-qemu: true
+          - file: ./src/telemetry-docs/Dockerfile
+            tag_suffix: telemetry-docs
+            context: ./
+            setup-qemu: true
           - file: ./test/tracetesting/Dockerfile
             tag_suffix: traceBasedTests
             context: ./
             setup-qemu: true
 
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           fetch-depth: 0
       - name: Load environment variables from .env file
@@ -184,51 +182,47 @@ jobs:
             echo "Changes detected in ${{ matrix.file_tag.context }}, proceeding with build."
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v5.1.1
-        with:
-          role-to-assume: arn:aws:iam::014498635196:role/opentelemetry-demo-github
-          aws-region: ${{ env.AWS_REGION }}
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2.0.1
       - name: Log in to the Container registry
-        uses: docker/login-action@v4
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121  # v4.1.0
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
-        if: ${{ inputs.push }}
+        if: ${{ inputs.push && !github.event.repository.fork }}
+      - name: Log in to Docker Hub
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121  # v4.1.0
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+        if: ${{ inputs.push && !github.event.repository.fork }}
       - name: Set up QEMU
         if: ${{ matrix.file_tag.setup-qemu }}
-        uses: docker/setup-qemu-action@v4
+        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a  # v4.0.0
         with:
           image: tonistiigi/binfmt:master
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd  # v4.0.0
         with:
           buildkitd-config-inline: |
             [worker.oci]
             max-parallelism = 2
       - name: Matrix Build and push demo images
         if: steps.check_changes.outputs.skip == 'false'
-        uses: docker/build-push-action@v7.0.0
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f  # v7.1.0
         with:
           context: ${{ matrix.file_tag.context }}
           file: ${{ matrix.file_tag.file }}
           platforms: linux/amd64,linux/arm64
-          push: ${{ inputs.push }}
+          push: ${{ inputs.push && !github.event.repository.fork }}
           build-args: |
             OTEL_JAVA_AGENT_VERSION=${{ env.OTEL_JAVA_AGENT_VERSION }}
             OPENTELEMETRY_CPP_VERSION=${{ env.OPENTELEMETRY_CPP_VERSION }}
             TRACETEST_IMAGE_VERSION=${{ env.TRACETEST_IMAGE_VERSION }}
             OPENSEARCH_IMAGE=${{ env.OPENSEARCH_IMAGE }}
           tags: |
+            ${{ inputs.dockerhub_repo }}:${{ inputs.version }}-${{matrix.file_tag.tag_suffix }}
+            ${{ inputs.dockerhub_repo }}:latest-${{matrix.file_tag.tag_suffix }}
             ${{ inputs.ghcr_repo }}:${{ inputs.version }}-${{ matrix.file_tag.tag_suffix }}
             ${{ inputs.ghcr_repo }}:latest-${{ matrix.file_tag.tag_suffix }}
-            ${{env.ECR_REGISTRY}}/${{env.ECR_REPOSITORY}}:${{ inputs.version }}-${{ matrix.file_tag.tag_suffix }}
-            ${{env.ECR_REGISTRY}}/${{env.ECR_REPOSITORY}}:latest-${{ matrix.file_tag.tag_suffix }}
           cache-from: type=gha
           cache-to: type=gha
