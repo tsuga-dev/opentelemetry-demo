@@ -11,27 +11,22 @@ on:
         type: boolean
       version:
         description: The version used when tagging the image
-        default: "dev"
+        default: 'dev'
         required: false
         type: string
       dockerhub_repo:
         description: Docker Hub repository
-        default: "otel/demo"
+        default: 'otel/demo'
         required: false
         type: string
       ghcr_repo:
         description: GHCR repository
-        default: "ghcr.io/tsuga-dev/otel-demo"
+        default: 'ghcr.io/open-telemetry/demo'
         required: false
         type: string
 
 permissions:
   contents: read
-  id-token: write
-
-env:
-  AWS_REGION: "eu-central-1"
-  ECR_REPOSITORY: "tsuga-dev/otel-demo"
 
 jobs:
   protobufcheck:
@@ -51,7 +46,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-      id-token: write
 
     env:
       RELEASE_VERSION: "${{ github.event.release.tag_name }}"
@@ -174,44 +168,20 @@ jobs:
           fi
       - name: Check for changes and set push options
         id: check_changes
-        env:
-          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          PUSH_BEFORE_SHA: ${{ github.event.before }}
-          HEAD_SHA: ${{ github.sha }}
         run: |
+          DOCKERFILE_DIR=$(dirname ${{ matrix.file_tag.file }})
+          FILES_CHANGED=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }} -- $DOCKERFILE_DIR)
           FORCE_PUSH=${{ inputs.push }}
           if [ "$FORCE_PUSH" = true ]; then
             echo "Force push is enabled, proceeding with build."
             echo "skip=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          DOCKERFILE_DIR=$(dirname ${{ matrix.file_tag.file }})
-          BASE_SHA="${PR_BASE_SHA:-$PUSH_BEFORE_SHA}"
-
-          # Non-PR callers do not always provide a usable base SHA. Build instead of failing.
-          if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
-            echo "No base SHA available, proceeding with build."
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          FILES_CHANGED=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- "$DOCKERFILE_DIR")
-          if [ -z "$FILES_CHANGED" ]; then
+          elif [ -z "$FILES_CHANGED" ]; then
             echo "No changes in ${{ matrix.file_tag.context }}, skipping build."
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
             echo "Changes detected in ${{ matrix.file_tag.context }}, proceeding with build."
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v5.1.1
-        with:
-          role-to-assume: arn:aws:iam::014498635196:role/opentelemetry-demo-github
-          aws-region: ${{ env.AWS_REGION }}
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2.0.1
       - name: Log in to the Container registry
         uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121  # v4.1.0
         with:
@@ -250,9 +220,9 @@ jobs:
             TRACETEST_IMAGE_VERSION=${{ env.TRACETEST_IMAGE_VERSION }}
             OPENSEARCH_IMAGE=${{ env.OPENSEARCH_IMAGE }}
           tags: |
+            ${{ inputs.dockerhub_repo }}:${{ inputs.version }}-${{matrix.file_tag.tag_suffix }}
+            ${{ inputs.dockerhub_repo }}:latest-${{matrix.file_tag.tag_suffix }}
             ${{ inputs.ghcr_repo }}:${{ inputs.version }}-${{ matrix.file_tag.tag_suffix }}
             ${{ inputs.ghcr_repo }}:latest-${{ matrix.file_tag.tag_suffix }}
-            ${{env.ECR_REGISTRY}}/${{env.ECR_REPOSITORY}}:${{ inputs.version }}-${{ matrix.file_tag.tag_suffix }}
-            ${{env.ECR_REGISTRY}}/${{env.ECR_REPOSITORY}}:latest-${{ matrix.file_tag.tag_suffix }}
           cache-from: type=gha
           cache-to: type=gha
