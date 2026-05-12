@@ -14,11 +14,14 @@ use OpenTelemetry\SDK\Common\Configuration\Variables;
 use OpenTelemetry\SDK\Logs\LoggerProviderInterface;
 use OpenTelemetry\SDK\Metrics\MeterProviderInterface;
 use OpenTelemetry\SDK\Trace\TracerProviderInterface;
+use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use React\EventLoop\Loop;
 use React\Http\HttpServer;
+use React\Http\Message\Response;
 use React\Socket\SocketServer;
 use Slim\Factory\AppFactory;
+use Psr\Log\LoggerInterface;
 
 require __DIR__ . '/../vendor/autoload.php';
 
@@ -36,12 +39,16 @@ $dependencies($containerBuilder);
 // Build PHP-DI Container instance
 $container = $containerBuilder->build();
 
+$logger = $container->get(LoggerInterface::class);
+
 // Instantiate the app
 AppFactory::setContainer($container);
 $app = Bridge::create($container);
 
 // Register middleware
+require __DIR__ . '/../rate-limiter.php';
 $app->addRoutingMiddleware();
+$app->add(new RateLimiter(0));
 
 // Register routes
 $routes = require __DIR__ . '/../app/routes.php';
@@ -52,6 +59,20 @@ $app->addBodyParsingMiddleware();
 
 // Add Error Middleware
 $errorMiddleware = $app->addErrorMiddleware(true, true, true);
+$errorMiddleware->setDefaultErrorHandler(function (
+    ServerRequestInterface $request,
+    \Throwable $exception,
+    bool $displayErrorDetails,
+    bool $logErrors,
+    bool $logErrorDetails
+) use ($logger, $app): ResponseInterface {
+    $logger->error($exception->getMessage(), [
+        'exception' => get_class($exception),
+        'file'      => $exception->getFile(),
+        'line'      => $exception->getLine(),
+    ]);
+    return new Response(500, [], $exception->getMessage());
+});
 Loop::get()->addSignal(SIGTERM, function() {
     exit;
 });
