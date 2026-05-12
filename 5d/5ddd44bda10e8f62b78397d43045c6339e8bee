@@ -1,0 +1,23 @@
+src/quote/public/index.php
+  s_2e769f7dee3b03::t_4eea1827ce470e 17,21,24
+  s_2e769f7dee3b03::t_2376c9b9b94350 42-43,49,51
+  s_2e769f7dee3b03::t_27e2b59252e91d 62-75
+src/quote/rate-limiter.php
+  s_2e769f7dee3b03::t_8cd5b54fc8b26f 1-41
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "5d5ddd44bda10e8f62b78397d43045c6339e8bee",
+  "prompts": {},
+  "sessions": {
+    "s_2e769f7dee3b03": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bf373392-fe47-4ec2-889b-18f71bd5dea2",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Arthur Verrez <arthurverrez@gmail.com>"
+    }
+  }
+}
