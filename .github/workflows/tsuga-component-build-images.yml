@@ -182,11 +182,11 @@ jobs:
             echo "Changes detected in ${{ matrix.file_tag.context }}, proceeding with build."
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
-          - name: Configure AWS credentials
-          uses: aws-actions/configure-aws-credentials@v5.1.1
-          with:
-            role-to-assume: arn:aws:iam::014498635196:role/opentelemetry-demo-github
-            aws-region: ${{ env.AWS_REGION }}
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v5.1.1
+        with:
+          role-to-assume: arn:aws:iam::014498635196:role/opentelemetry-demo-github
+          aws-region: ${{ vars.AWS_REGION }}
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2.0.1
