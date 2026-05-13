@@ -27,6 +27,11 @@ on:
 
 permissions:
   contents: read
+  id-token: write
+
+env:
+  AWS_REGION: "eu-central-1"
+  ECR_REPOSITORY: "tsuga-dev/otel-demo"
 
 jobs:
   protobufcheck:
@@ -186,7 +191,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v5.1.1
         with:
           role-to-assume: arn:aws:iam::014498635196:role/opentelemetry-demo-github
-          aws-region: ${{ vars.AWS_REGION }}
+          aws-region: ${{ env.AWS_REGION }}
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2.0.1
