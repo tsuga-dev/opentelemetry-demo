@@ -51,6 +51,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write
 
     env:
       RELEASE_VERSION: "${{ github.event.release.tag_name }}"
@@ -173,6 +174,8 @@ jobs:
           fi
       - name: Check for changes and set push options
         id: check_changes
+        env:
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
         run: |
           DOCKERFILE_DIR=$(dirname ${{ matrix.file_tag.file }})
           FILES_CHANGED=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }} -- $DOCKERFILE_DIR)
