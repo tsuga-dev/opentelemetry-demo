@@ -217,16 +217,18 @@ jobs:
         with:
           role-to-assume: arn:aws:iam::014498635196:role/opentelemetry-demo-github
           aws-region: ${{ env.AWS_REGION }}
+        if: ${{ inputs.push }}
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2.0.1
+        if: ${{ inputs.push }}
       - name: Log in to the Container registry
         uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121  # v4.1.0
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
-        if: ${{ inputs.push && !github.event.repository.fork }}
+        if: ${{ inputs.push }}
       - name: Log in to Docker Hub
         uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121  # v4.1.0
         with:
@@ -253,7 +255,7 @@ jobs:
           context: ${{ matrix.file_tag.context }}
           file: ${{ matrix.file_tag.file }}
           platforms: linux/amd64,linux/arm64
-          push: ${{ inputs.push && !github.event.repository.fork }}
+          push: ${{ inputs.push }}
           build-args: |
             OTEL_JAVA_AGENT_VERSION=${{ env.OTEL_JAVA_AGENT_VERSION }}
             OPENTELEMETRY_CPP_VERSION=${{ env.OPENTELEMETRY_CPP_VERSION }}
