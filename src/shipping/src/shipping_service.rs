@@ -18,16 +18,13 @@ pub use shipping_types::*;
 const NANOS_MULTIPLE: u32 = 10000000u32;
 
 // --- Faulty-build degradation (Tsuga demo) -----------------------------------
-// Gated on FAULTY_BUILD=1, which the Phase 3 fault overlay sets at deploy time.
-// The env is read per-request so the same image behaves normally unless the
-// overlay flips it on. Introduces a bounded regression (added latency + a
-// fractional error rate) — a detectable degradation, never a hard crash.
+// Degradation is unconditional: this image always degrades. The fault is
+// isolated by branch/image (this faulty build), not by any runtime env gate.
+// Introduces a bounded regression (added latency + a fractional error rate) —
+// a detectable degradation, never a hard crash.
 // Returns Err(message) ~15% of the time; the caller maps that to a 500.
 // nanos % 100 is used as a dependency-free pseudo-random source (no rand crate).
 async fn maybe_degrade() -> Result<(), &'static str> {
-    if std::env::var("FAULTY_BUILD").as_deref() != Ok("1") {
-        return Ok(());
-    }
     actix_web::rt::time::sleep(std::time::Duration::from_millis(400)).await; // added p50 latency
     let nanos = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
