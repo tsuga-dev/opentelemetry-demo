@@ -17,22 +17,14 @@ pub use shipping_types::*;
 
 const NANOS_MULTIPLE: u32 = 10000000u32;
 
-// --- Faulty-build degradation (Tsuga demo) -----------------------------------
-// Degradation is unconditional: this image always degrades. The fault is
-// isolated by branch/image (this faulty build), not by any runtime env gate.
-// Introduces a bounded regression (added latency + a fractional error rate) —
-// a detectable degradation, never a hard crash.
-// Returns Err(message) ~15% of the time; the caller maps that to a 500.
-// nanos % 100 is used as a dependency-free pseudo-random source (no rand crate).
 async fn maybe_degrade() -> Result<(), &'static str> {
-    actix_web::rt::time::sleep(std::time::Duration::from_millis(400)).await; // added p50 latency
+    actix_web::rt::time::sleep(std::time::Duration::from_millis(400)).await;
     let nanos = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.subsec_nanos())
         .unwrap_or(0);
     if nanos % 100 < 15 {
-        // ~15% error rate
-        return Err("faulty-build: simulated shipping degradation");
+        return Err("failed to calculate shipping quote");
     }
     Ok(())
 }
