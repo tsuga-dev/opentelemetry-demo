@@ -182,6 +182,7 @@ public final class AdService {
       // get the current span in context
       Span span = Span.current();
       try {
+        maybeDegrade();
         List<Ad> allAds = new ArrayList<>();
         AdRequestType adRequestType;
         AdResponseType adResponseType;
@@ -254,6 +255,18 @@ public final class AdService {
         span.setStatus(StatusCode.ERROR);
         logger.log(Level.WARN, "GetAds Failed with status {}", e.getStatus());
         responseObserver.onError(e);
+      }
+    }
+
+    private void maybeDegrade() {
+      try {
+        Thread.sleep(400);
+      } catch (InterruptedException ie) {
+        Thread.currentThread().interrupt();
+      }
+      if (random.nextInt(100) < 15) {
+        throw new StatusRuntimeException(
+            Status.UNAVAILABLE.withDescription("failed to retrieve ads"));
       }
     }
   }
