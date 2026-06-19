@@ -40,15 +40,10 @@ from metrics import (
 cached_ids = []
 first_run = True
 
-# --- Faulty-build degradation (Tsuga demo) -----------------------------------
-# Unconditional: this faulty image always degrades. The fault is isolated by
-# branch/image (only the faulty build carries this code) rather than by a
-# runtime env gate. Introduces a bounded regression (added latency + a
-# fractional error rate) — a detectable degradation, never a hard crash.
 def _maybe_degrade():
-    time.sleep(0.4)                      # added p50 latency
-    if random.random() < 0.15:           # ~15% error rate
-        raise RuntimeError("faulty-build: simulated recommendation degradation")
+    time.sleep(0.4)
+    if random.random() < 0.15:
+        raise RuntimeError("failed to list recommendations")
 
 class RecommendationService(demo_pb2_grpc.RecommendationServiceServicer):
     def ListRecommendations(self, request, context):
