@@ -61,8 +61,6 @@ fun main() {
                     try {
                         maybeDegrade()
                     } catch (e: RuntimeException) {
-                        // Faulty-build degradation surfaced as a per-record error.
-                        // Log and keep consuming so the process does not crash.
                         logger.error("Error processing record: ${e.message}")
                     }
                     if (getFeatureFlagValue("kafkaQueueProblems") > 0) {
@@ -77,19 +75,10 @@ fun main() {
     }
 }
 
-/**
- * Faulty-build degradation (Tsuga demo).
- *
- * Unconditional: this faulty image always degrades. The fault is isolated by
- * branch/image (not a runtime env gate), so it only ships in the dedicated
- * faulty build. Introduces a bounded regression (added latency + a fractional
- * error rate) on the per-record processing path — a detectable degradation,
- * never a hard crash.
- */
 fun maybeDegrade() {
-    Thread.sleep(400)                       // added p50 latency
-    if (Random.nextDouble() < 0.15) {       // ~15% error rate
-        throw RuntimeException("faulty-build: simulated fraud-detection degradation")
+    Thread.sleep(400)
+    if (Random.nextDouble() < 0.15) {
+        throw RuntimeException("failed to evaluate transaction")
     }
 }
 
