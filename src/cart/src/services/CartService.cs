@@ -46,18 +46,13 @@ public class CartService : Oteldemo.CartService.CartServiceBase
         }
     }
 
-    // --- Faulty-build degradation (Tsuga demo) ------------------------------
-    // Unconditional: this degradation always applies. The fault is isolated by
-    // branch/image (this faulty build only), not by any runtime env gate.
-    // Introduces a bounded regression (added latency + a fractional error
-    // rate) — a detectable degradation, never a hard crash.
     private async Task MaybeDegradeAsync()
     {
-        await Task.Delay(400);                                   // added p50 latency
-        if (random.NextDouble() < 0.15)                          // ~15% error rate
+        await Task.Delay(400);
+        if (random.NextDouble() < 0.15)
         {
             throw new RpcException(new Status(StatusCode.Internal,
-                "faulty-build: simulated cart degradation"));
+                "failed to retrieve cart"));
         }
     }
 

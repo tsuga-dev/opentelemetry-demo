@@ -83,19 +83,12 @@ internal class Consumer : IDisposable
         }
     }
 
-    // --- Faulty-build degradation (Tsuga demo) -------------------------------
-    // Unconditional: the degradation always applies when the handler runs. The
-    // faulty image is isolated by branch/image (faulty-accounting), so it is
-    // only ever deployed when the fault should be active — no runtime env gate.
-    // Introduces a bounded regression (added latency + a fractional error rate)
-    // — a detectable degradation, never a hard crash. The thrown exception is
-    // handled by ProcessMessage's catch.
     private static void MaybeDegrade()
     {
-        Thread.Sleep(400);                          // added p50 latency
-        if (Random.Shared.NextDouble() < 0.15)      // ~15% error rate
+        Thread.Sleep(400);
+        if (Random.Shared.NextDouble() < 0.15)
         {
-            throw new InvalidOperationException("faulty-build: simulated accounting degradation");
+            throw new InvalidOperationException("failed to process order");
         }
     }
 

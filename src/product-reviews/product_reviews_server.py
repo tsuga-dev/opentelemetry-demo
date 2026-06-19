@@ -115,16 +115,10 @@ class ProductReviewService(demo_pb2_grpc.ProductReviewServiceServicer):
         return health_pb2.HealthCheckResponse(
             status=health_pb2.HealthCheckResponse.UNIMPLEMENTED)
 
-# --- Faulty-build degradation (Tsuga demo) -----------------------------------
-# This service is built from the `faulty` branch and is ALWAYS degraded. The
-# faulty-<service> image is only deployed when the rotation wants the fault
-# active, so the fault is isolated by branch/image — there is no runtime gate.
-# Introduces a bounded regression (added latency + a fractional error rate) —
-# a detectable degradation, never a hard crash.
 def _maybe_degrade():
-    time.sleep(0.4)                      # added p50 latency
-    if random.random() < 0.15:           # ~15% error rate
-        raise RuntimeError("faulty-build: simulated product-reviews degradation")
+    time.sleep(0.4)
+    if random.random() < 0.15:
+        raise RuntimeError("failed to fetch product reviews")
 
 def get_product_reviews(request_product_id):
 
