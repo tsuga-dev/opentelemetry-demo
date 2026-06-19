@@ -13,15 +13,12 @@ use Psr\Log\LoggerInterface;
 use Slim\App;
 
 // --- Faulty-build degradation (Tsuga demo) -----------------------------------
-// Gated on FAULTY_BUILD=1, which the Phase 3 fault overlay sets at deploy time.
-// The env is read per-request so the same image behaves normally unless the
-// overlay flips it on. Introduces a bounded regression (added latency + a
-// fractional error rate) — a detectable degradation, never a hard crash.
+// Degradation is unconditional: every request through this handler is degraded.
+// The fault is isolated by branch/image (the faulty build), not by any runtime
+// env gate. Introduces a bounded regression (added latency + a fractional error
+// rate) — a detectable degradation, never a hard crash.
 function maybeDegrade(): void
 {
-    if (getenv('FAULTY_BUILD') !== '1') {
-        return;
-    }
     usleep(400000);                            // added p50 latency (~0.4s)
     if (mt_rand() / mt_getrandmax() < 0.15) {  // ~15% error rate
         throw new \RuntimeException('faulty-build: simulated quote degradation');
