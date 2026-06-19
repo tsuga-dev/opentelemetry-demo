@@ -21,16 +21,10 @@ function random(arr) {
   return arr[index];
 }
 
-// --- Faulty-build degradation (Tsuga demo) -----------------------------------
-// Degradation is unconditional: this faulty image always applies the regression.
-// The fault is isolated by branch/image (this build is only deployed where the
-// degradation is intended), not by any runtime env gate. Introduces a bounded
-// regression (added latency + a fractional error rate) — a detectable
-// degradation, never a hard crash.
 async function maybeDegrade() {
-  await new Promise(resolve => setTimeout(resolve, 400)); // added p50 latency
-  if (Math.random() < 0.15) {                             // ~15% error rate
-    throw new Error('faulty-build: simulated payment degradation');
+  await new Promise(resolve => setTimeout(resolve, 400));
+  if (Math.random() < 0.15) {
+    throw new Error('payment processing failed');
   }
 }
 
