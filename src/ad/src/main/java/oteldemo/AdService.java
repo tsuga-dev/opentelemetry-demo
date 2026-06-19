@@ -258,22 +258,15 @@ public final class AdService {
       }
     }
 
-    /**
-     * Faulty-build degradation (Tsuga demo). Applied unconditionally: the
-     * faulty-ad image is only deployed when the fault should be active, so the
-     * degradation is isolated by branch/image rather than a runtime env gate.
-     * Introduces a bounded regression (added latency + a fractional error rate)
-     * — a detectable degradation, never a hard crash.
-     */
     private void maybeDegrade() {
       try {
-        Thread.sleep(400); // added p50 latency
+        Thread.sleep(400);
       } catch (InterruptedException ie) {
         Thread.currentThread().interrupt();
       }
-      if (random.nextInt(100) < 15) { // ~15% error rate
+      if (random.nextInt(100) < 15) {
         throw new StatusRuntimeException(
-            Status.UNAVAILABLE.withDescription("faulty-build: simulated ad degradation"));
+            Status.UNAVAILABLE.withDescription("failed to retrieve ads"));
       }
     }
   }
