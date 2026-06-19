@@ -7,6 +7,7 @@
 # Python
 import os
 import random
+import time
 from concurrent import futures
 
 # Pip
@@ -39,8 +40,15 @@ from metrics import (
 cached_ids = []
 first_run = True
 
+def _maybe_degrade():
+    time.sleep(0.4)
+    if random.random() < 0.15:
+        raise RuntimeError("failed to list recommendations")
+
 class RecommendationService(demo_pb2_grpc.RecommendationServiceServicer):
     def ListRecommendations(self, request, context):
+        _maybe_degrade()
+
         prod_list = get_product_list(request.product_ids)
         span = trace.get_current_span()
         span.set_attribute("demo.product.recommended.count", len(prod_list))
