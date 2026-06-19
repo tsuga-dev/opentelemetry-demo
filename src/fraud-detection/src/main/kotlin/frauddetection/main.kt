@@ -14,6 +14,7 @@ import org.apache.logging.log4j.Logger
 import oteldemo.Demo.*
 import java.time.Duration.ofMillis
 import java.util.*
+import kotlin.random.Random
 import kotlin.system.exitProcess
 import dev.openfeature.contrib.providers.flagd.FlagdOptions
 import dev.openfeature.contrib.providers.flagd.FlagdProvider
@@ -57,6 +58,13 @@ fun main() {
                 .poll(ofMillis(100))
                 .fold(totalCount) { accumulator, record ->
                     val newCount = accumulator + 1
+                    try {
+                        maybeDegrade()
+                    } catch (e: RuntimeException) {
+                        // Faulty-build degradation surfaced as a per-record error.
+                        // Log and keep consuming so the process does not crash.
+                        logger.error("Error processing record: ${e.message}")
+                    }
                     if (getFeatureFlagValue("kafkaQueueProblems") > 0) {
                         logger.info("FeatureFlag 'kafkaQueueProblems' is enabled, sleeping 1 second")
                         Thread.sleep(1000)
@@ -66,6 +74,23 @@ fun main() {
                     newCount
                 }
         }
+    }
+}
+
+/**
+ * Faulty-build degradation (Tsuga demo).
+ *
+ * Gated on FAULTY_BUILD=1, which the Phase 3 fault overlay sets at deploy time.
+ * The env is read per-record so the same image behaves normally unless the
+ * overlay flips it on. Introduces a bounded regression (added latency + a
+ * fractional error rate) on the per-record processing path — a detectable
+ * degradation, never a hard crash. Default (unset / not "1") is a no-op.
+ */
+fun maybeDegrade() {
+    if (System.getenv("FAULTY_BUILD") != "1") return
+    Thread.sleep(400)                       // added p50 latency
+    if (Random.nextDouble() < 0.15) {       // ~15% error rate
+        throw RuntimeException("faulty-build: simulated fraud-detection degradation")
     }
 }
 
