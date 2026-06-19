@@ -40,7 +40,22 @@ OpenTelemetry.meter_provider.add_metric_reader(otlp_metric_exporter)
 meter = OpenTelemetry.meter_provider.meter("email")
 $confirmation_counter = meter.create_counter("demo.notification.confirmations", unit: "1", description: "Counts the number of order confirmation emails sent")
 
+# --- Faulty-build degradation (Tsuga demo) -----------------------------------
+# Gated on FAULTY_BUILD=1, which the Phase 3 fault overlay sets at deploy time.
+# The env is read per-request so the same image behaves normally unless the
+# overlay flips it on. Introduces a bounded regression (added latency + a
+# fractional error rate) — a detectable degradation, never a hard crash.
+def maybe_degrade
+  return unless ENV["FAULTY_BUILD"] == "1"
+  sleep(0.4)                          # added p50 latency
+  if rand < 0.15                      # ~15% error rate
+    raise "faulty-build: simulated email degradation"
+  end
+end
+
 post "/send_order_confirmation" do
+  maybe_degrade
+
   data = JSON.parse(request.body.read, object_class: OpenStruct)
 
   # get the current auto-instrumented span
