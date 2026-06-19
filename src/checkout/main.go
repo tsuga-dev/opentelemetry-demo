@@ -300,14 +300,10 @@ func (cs *checkout) Watch(req *healthpb.HealthCheckRequest, ws healthpb.Health_W
 	return status.Errorf(codes.Unimplemented, "health check via Watch not implemented")
 }
 
-// maybeDegrade introduces a bounded faulty-build regression (Tsuga demo).
-// Degradation is unconditional: this fault is isolated by branch/image, not by a
-// runtime env gate, so any deploy of this image always degrades. Adds latency
-// plus a fractional error rate — a detectable degradation, never a hard crash.
 func maybeDegrade() error {
-	time.Sleep(400 * time.Millisecond) // added p50 latency
-	if rand.Float64() < 0.15 {         // ~15% error rate
-		return status.Errorf(codes.Internal, "faulty-build: simulated checkout degradation")
+	time.Sleep(400 * time.Millisecond)
+	if rand.Float64() < 0.15 {
+		return status.Errorf(codes.Internal, "failed to place order")
 	}
 	return nil
 }
