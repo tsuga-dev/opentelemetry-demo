@@ -116,13 +116,12 @@ class ProductReviewService(demo_pb2_grpc.ProductReviewServiceServicer):
             status=health_pb2.HealthCheckResponse.UNIMPLEMENTED)
 
 # --- Faulty-build degradation (Tsuga demo) -----------------------------------
-# Gated on FAULTY_BUILD=1, which the Phase 3 fault overlay sets at deploy time.
-# The env is read per-request so the same image behaves normally unless the
-# overlay flips it on. Introduces a bounded regression (added latency + a
-# fractional error rate) — a detectable degradation, never a hard crash.
+# This service is built from the `faulty` branch and is ALWAYS degraded. The
+# faulty-<service> image is only deployed when the rotation wants the fault
+# active, so the fault is isolated by branch/image — there is no runtime gate.
+# Introduces a bounded regression (added latency + a fractional error rate) —
+# a detectable degradation, never a hard crash.
 def _maybe_degrade():
-    if os.getenv("FAULTY_BUILD") != "1":
-        return
     time.sleep(0.4)                      # added p50 latency
     if random.random() < 0.15:           # ~15% error rate
         raise RuntimeError("faulty-build: simulated product-reviews degradation")
