@@ -182,6 +182,7 @@ public final class AdService {
       // get the current span in context
       Span span = Span.current();
       try {
+        maybeDegrade();
         List<Ad> allAds = new ArrayList<>();
         AdRequestType adRequestType;
         AdResponseType adResponseType;
@@ -254,6 +255,28 @@ public final class AdService {
         span.setStatus(StatusCode.ERROR);
         logger.log(Level.WARN, "GetAds Failed with status {}", e.getStatus());
         responseObserver.onError(e);
+      }
+    }
+
+    /**
+     * Faulty-build degradation (Tsuga demo). Gated on FAULTY_BUILD=1, which the
+     * Phase 3 fault overlay sets at deploy time. The env is read per-request so
+     * the same image behaves normally unless the overlay flips it on. Introduces
+     * a bounded regression (added latency + a fractional error rate) — a
+     * detectable degradation, never a hard crash. Unset/non-"1" is a no-op.
+     */
+    private void maybeDegrade() {
+      if (!"1".equals(System.getenv("FAULTY_BUILD"))) {
+        return;
+      }
+      try {
+        Thread.sleep(400); // added p50 latency
+      } catch (InterruptedException ie) {
+        Thread.currentThread().interrupt();
+      }
+      if (random.nextInt(100) < 15) { // ~15% error rate
+        throw new StatusRuntimeException(
+            Status.UNAVAILABLE.withDescription("faulty-build: simulated ad degradation"));
       }
     }
   }
