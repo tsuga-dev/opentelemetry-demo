@@ -83,10 +83,32 @@ internal class Consumer : IDisposable
         }
     }
 
+    // --- Faulty-build degradation (Tsuga demo) -------------------------------
+    // Gated on FAULTY_BUILD=1, which the Phase 3 fault overlay sets at deploy
+    // time. The env is read per-message so the same image behaves normally
+    // unless the overlay flips it on. Introduces a bounded regression (added
+    // latency + a fractional error rate) — a detectable degradation, never a
+    // hard crash. The thrown exception is handled by ProcessMessage's catch.
+    private static void MaybeDegrade()
+    {
+        if (Environment.GetEnvironmentVariable("FAULTY_BUILD") != "1")
+        {
+            return;
+        }
+
+        Thread.Sleep(400);                          // added p50 latency
+        if (Random.Shared.NextDouble() < 0.15)      // ~15% error rate
+        {
+            throw new InvalidOperationException("faulty-build: simulated accounting degradation");
+        }
+    }
+
     private void ProcessMessage(Message<string, byte[]> message)
     {
         try
         {
+            MaybeDegrade();
+
             var order = OrderResult.Parser.ParseFrom(message.Value);
             Log.OrderReceivedMessage(_logger, order);
 
