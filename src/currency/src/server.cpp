@@ -91,18 +91,12 @@ namespace
   nostd::unique_ptr<metrics_api::Counter<uint64_t>> currency_counter;
   nostd::shared_ptr<opentelemetry::logs::Logger> logger;
 
-// --- Faulty-build degradation (Tsuga demo) -----------------------------------
-// Unconditional: this faulty image is always degraded. The fault is isolated by
-// branch/image (this build only) rather than a runtime env gate, so no FAULTY_BUILD
-// check is needed. Introduces a bounded regression (added latency + a fractional
-// error rate) -- a detectable degradation, never a hard crash.
-// Returns true when the caller should fail the request with a gRPC error.
 bool MaybeDegrade()
 {
-  std::this_thread::sleep_for(std::chrono::milliseconds(400));   // added p50 latency
+  std::this_thread::sleep_for(std::chrono::milliseconds(400));
   static thread_local std::mt19937 rng{std::random_device{}()};
   std::uniform_real_distribution<double> dist(0.0, 1.0);
-  return dist(rng) < 0.15;                                       // ~15% error rate
+  return dist(rng) < 0.15;
 }
 
 class HealthServer final : public grpc::health::v1::Health::Service
@@ -206,11 +200,11 @@ class CurrencyService final : public oteldemo::CurrencyService::Service
     span->AddEvent("Processing currency conversion request");
 
     if (MaybeDegrade()) {
-      span->AddEvent("Faulty build: simulated currency degradation");
+      span->AddEvent("Currency conversion failed");
       span->SetStatus(StatusCode::kError);
-      logger->Error(std::string(__func__) + " faulty-build: simulated currency degradation");
+      logger->Error(std::string(__func__) + " currency conversion failed");
       span->End();
-      return Status(grpc::StatusCode::INTERNAL, "faulty-build: simulated currency degradation");
+      return Status(grpc::StatusCode::INTERNAL, "currency conversion failed");
     }
 
     try {
