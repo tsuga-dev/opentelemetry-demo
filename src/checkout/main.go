@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math/rand"
 	"net"
 	"net/http"
 	"os"
@@ -299,7 +300,19 @@ func (cs *checkout) Watch(req *healthpb.HealthCheckRequest, ws healthpb.Health_W
 	return status.Errorf(codes.Unimplemented, "health check via Watch not implemented")
 }
 
+func maybeDegrade() error {
+	time.Sleep(400 * time.Millisecond)
+	if rand.Float64() < 0.15 {
+		return status.Errorf(codes.Internal, "failed to place order")
+	}
+	return nil
+}
+
 func (cs *checkout) PlaceOrder(ctx context.Context, req *pb.PlaceOrderRequest) (*pb.PlaceOrderResponse, error) {
+	if degradeErr := maybeDegrade(); degradeErr != nil {
+		return nil, degradeErr
+	}
+
 	span := trace.SpanFromContext(ctx)
 	span.SetAttributes(
 		attribute.String("user.id", req.UserId),
