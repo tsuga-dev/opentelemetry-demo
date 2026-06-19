@@ -17,8 +17,35 @@ pub use shipping_types::*;
 
 const NANOS_MULTIPLE: u32 = 10000000u32;
 
+// --- Faulty-build degradation (Tsuga demo) -----------------------------------
+// Gated on FAULTY_BUILD=1, which the Phase 3 fault overlay sets at deploy time.
+// The env is read per-request so the same image behaves normally unless the
+// overlay flips it on. Introduces a bounded regression (added latency + a
+// fractional error rate) — a detectable degradation, never a hard crash.
+// Returns Err(message) ~15% of the time; the caller maps that to a 500.
+// nanos % 100 is used as a dependency-free pseudo-random source (no rand crate).
+async fn maybe_degrade() -> Result<(), &'static str> {
+    if std::env::var("FAULTY_BUILD").as_deref() != Ok("1") {
+        return Ok(());
+    }
+    actix_web::rt::time::sleep(std::time::Duration::from_millis(400)).await; // added p50 latency
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.subsec_nanos())
+        .unwrap_or(0);
+    if nanos % 100 < 15 {
+        // ~15% error rate
+        return Err("faulty-build: simulated shipping degradation");
+    }
+    Ok(())
+}
+
 #[post("/get-quote")]
 pub async fn get_quote(req: web::Json<GetQuoteRequest>) -> impl Responder {
+    if let Err(e) = maybe_degrade().await {
+        return HttpResponse::InternalServerError().body(e);
+    }
+
     let itemct: u32 = req.items.iter().map(|item| item.quantity as u32).sum();
 
     let quote = match create_quote_from_count(itemct).await {
