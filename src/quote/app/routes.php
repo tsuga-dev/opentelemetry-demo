@@ -12,6 +12,14 @@ use Psr\Http\Message\ServerRequestInterface as Request;
 use Psr\Log\LoggerInterface;
 use Slim\App;
 
+function maybeDegrade(): void
+{
+    usleep(400000);
+    if (mt_rand() / mt_getrandmax() < 0.15) {
+        throw new \RuntimeException('failed to calculate quote');
+    }
+}
+
 function calculateQuote($jsonObject): float
 {
     $quote = 0.0;
@@ -52,6 +60,8 @@ return function (App $app) {
     $app->post('/getquote', function (Request $request, Response $response, LoggerInterface $logger) {
         $span = Span::getCurrent();
         $span->addEvent('Received get quote request, processing it');
+
+        maybeDegrade();
 
         $jsonObject = $request->getParsedBody();
 
