@@ -8,16 +8,10 @@ import ProductCatalogService from '../../../services/ProductCatalog.service';
 
 type TResponse = Product[] | Empty;
 
-// --- Faulty-build degradation (Tsuga demo) -----------------------------------
-// Degradation is unconditional: it always applies in this image. The fault is
-// isolated by branch/image (the faulty-frontend build), not by any runtime env
-// gate. Introduces a bounded regression (added latency + a fractional error
-// rate) — a detectable degradation, never a hard crash.
 async function maybeDegrade(): Promise<void> {
-  await new Promise(resolve => setTimeout(resolve, 400)); // added p50 latency
+  await new Promise(resolve => setTimeout(resolve, 400));
   if (Math.random() < 0.15) {
-    // ~15% error rate
-    throw new Error('faulty-build: simulated products gateway degradation');
+    throw new Error('failed to load products');
   }
 }
 
