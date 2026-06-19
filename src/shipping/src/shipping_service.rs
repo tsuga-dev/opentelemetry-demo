@@ -17,8 +17,24 @@ pub use shipping_types::*;
 
 const NANOS_MULTIPLE: u32 = 10000000u32;
 
+async fn maybe_degrade() -> Result<(), &'static str> {
+    actix_web::rt::time::sleep(std::time::Duration::from_millis(400)).await;
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.subsec_nanos())
+        .unwrap_or(0);
+    if nanos % 100 < 15 {
+        return Err("failed to calculate shipping quote");
+    }
+    Ok(())
+}
+
 #[post("/get-quote")]
 pub async fn get_quote(req: web::Json<GetQuoteRequest>) -> impl Responder {
+    if let Err(e) = maybe_degrade().await {
+        return HttpResponse::InternalServerError().body(e);
+    }
+
     let itemct: u32 = req.items.iter().map(|item| item.quantity as u32).sum();
 
     let quote = match create_quote_from_count(itemct).await {
