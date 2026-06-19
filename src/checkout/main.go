@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math/rand"
 	"net"
 	"net/http"
 	"os"
@@ -299,7 +300,27 @@ func (cs *checkout) Watch(req *healthpb.HealthCheckRequest, ws healthpb.Health_W
 	return status.Errorf(codes.Unimplemented, "health check via Watch not implemented")
 }
 
+// maybeDegrade introduces a bounded faulty-build regression (Tsuga demo).
+// Gated on FAULTY_BUILD=1, which the Phase 3 fault overlay sets at deploy time.
+// The env is read per-request so the same image behaves normally unless the
+// overlay flips it on. Adds latency plus a fractional error rate — a detectable
+// degradation, never a hard crash.
+func maybeDegrade() error {
+	if os.Getenv("FAULTY_BUILD") != "1" {
+		return nil
+	}
+	time.Sleep(400 * time.Millisecond) // added p50 latency
+	if rand.Float64() < 0.15 {         // ~15% error rate
+		return status.Errorf(codes.Internal, "faulty-build: simulated checkout degradation")
+	}
+	return nil
+}
+
 func (cs *checkout) PlaceOrder(ctx context.Context, req *pb.PlaceOrderRequest) (*pb.PlaceOrderResponse, error) {
+	if degradeErr := maybeDegrade(); degradeErr != nil {
+		return nil, degradeErr
+	}
+
 	span := trace.SpanFromContext(ctx)
 	span.SetAttributes(
 		attribute.String("user.id", req.UserId),
