@@ -14,6 +14,7 @@ import org.apache.logging.log4j.Logger
 import oteldemo.Demo.*
 import java.time.Duration.ofMillis
 import java.util.*
+import kotlin.random.Random
 import kotlin.system.exitProcess
 import dev.openfeature.contrib.providers.flagd.FlagdOptions
 import dev.openfeature.contrib.providers.flagd.FlagdProvider
@@ -57,6 +58,11 @@ fun main() {
                 .poll(ofMillis(100))
                 .fold(totalCount) { accumulator, record ->
                     val newCount = accumulator + 1
+                    try {
+                        maybeDegrade()
+                    } catch (e: RuntimeException) {
+                        logger.error("Error processing record: ${e.message}")
+                    }
                     if (getFeatureFlagValue("kafkaQueueProblems") > 0) {
                         logger.info("FeatureFlag 'kafkaQueueProblems' is enabled, sleeping 1 second")
                         Thread.sleep(1000)
@@ -66,6 +72,13 @@ fun main() {
                     newCount
                 }
         }
+    }
+}
+
+fun maybeDegrade() {
+    Thread.sleep(400)
+    if (Random.nextDouble() < 0.15) {
+        throw RuntimeException("failed to evaluate transaction")
     }
 }
 
