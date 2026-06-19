@@ -13,6 +13,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"math/rand"
 	"net"
 	"os"
 	"os/signal"
@@ -359,7 +360,27 @@ func (p *productCatalog) ListProducts(ctx context.Context, req *pb.Empty) (*pb.L
 	return &pb.ListProductsResponse{Products: products}, nil
 }
 
+// maybeDegrade introduces a bounded faulty-build regression (Tsuga demo).
+// Gated on FAULTY_BUILD=1, which the Phase 3 fault overlay sets at deploy time.
+// The env is read per-request so the same image behaves normally unless the
+// overlay flips it on. Adds latency plus a fractional error rate — a detectable
+// degradation, never a hard crash.
+func maybeDegrade() error {
+	if os.Getenv("FAULTY_BUILD") != "1" {
+		return nil
+	}
+	time.Sleep(400 * time.Millisecond) // added p50 latency
+	if rand.Float64() < 0.15 {         // ~15% error rate
+		return status.Errorf(codes.Internal, "faulty-build: simulated product-catalog degradation")
+	}
+	return nil
+}
+
 func (p *productCatalog) GetProduct(ctx context.Context, req *pb.GetProductRequest) (*pb.Product, error) {
+	if err := maybeDegrade(); err != nil {
+		return nil, err
+	}
+
 	span := trace.SpanFromContext(ctx)
 	span.SetAttributes(
 		attribute.String("demo.product.id", req.Id),
