@@ -21,10 +21,19 @@ function random(arr) {
   return arr[index];
 }
 
+async function maybeDegrade() {
+  await new Promise(resolve => setTimeout(resolve, 400));
+  if (Math.random() < 0.15) {
+    throw new Error('payment processing failed');
+  }
+}
+
 module.exports.charge = async request => {
   const span = tracer.startSpan('charge');
 
   try {
+    await maybeDegrade();
+
     await OpenFeature.setProviderAndWait(flagProvider);
 
     const numberVariant = await OpenFeature.getClient().getNumberValue("paymentFailure", 0);
