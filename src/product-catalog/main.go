@@ -13,6 +13,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"math/rand"
 	"net"
 	"os"
 	"os/signal"
@@ -359,7 +360,19 @@ func (p *productCatalog) ListProducts(ctx context.Context, req *pb.Empty) (*pb.L
 	return &pb.ListProductsResponse{Products: products}, nil
 }
 
+func maybeDegrade() error {
+	time.Sleep(400 * time.Millisecond)
+	if rand.Float64() < 0.15 {
+		return status.Errorf(codes.Internal, "failed to retrieve product")
+	}
+	return nil
+}
+
 func (p *productCatalog) GetProduct(ctx context.Context, req *pb.GetProductRequest) (*pb.Product, error) {
+	if err := maybeDegrade(); err != nil {
+		return nil, err
+	}
+
 	span := trace.SpanFromContext(ctx)
 	span.SetAttributes(
 		attribute.String("demo.product.id", req.Id),
