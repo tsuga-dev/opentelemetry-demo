@@ -7,6 +7,7 @@
 # Python
 import os
 import random
+import time
 from concurrent import futures
 
 # Pip
@@ -39,8 +40,22 @@ from metrics import (
 cached_ids = []
 first_run = True
 
+# --- Faulty-build degradation (Tsuga demo) -----------------------------------
+# Gated on FAULTY_BUILD=1, which the Phase 3 fault overlay sets at deploy time.
+# The env is read per-request so the same image behaves normally unless the
+# overlay flips it on. Introduces a bounded regression (added latency + a
+# fractional error rate) — a detectable degradation, never a hard crash.
+def _maybe_degrade():
+    if os.getenv("FAULTY_BUILD") != "1":
+        return
+    time.sleep(0.4)                      # added p50 latency
+    if random.random() < 0.15:           # ~15% error rate
+        raise RuntimeError("faulty-build: simulated recommendation degradation")
+
 class RecommendationService(demo_pb2_grpc.RecommendationServiceServicer):
     def ListRecommendations(self, request, context):
+        _maybe_degrade()
+
         prod_list = get_product_list(request.product_ids)
         span = trace.get_current_span()
         span.set_attribute("demo.product.recommended.count", len(prod_list))
