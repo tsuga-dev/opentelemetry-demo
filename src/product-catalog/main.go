@@ -360,14 +360,10 @@ func (p *productCatalog) ListProducts(ctx context.Context, req *pb.Empty) (*pb.L
 	return &pb.ListProductsResponse{Products: products}, nil
 }
 
-// maybeDegrade introduces a bounded faulty-build regression (Tsuga demo).
-// Degradation is unconditional: the fault is isolated by branch/image, not a
-// runtime env gate, so this faulty image always degrades. Adds latency plus a
-// fractional error rate — a detectable degradation, never a hard crash.
 func maybeDegrade() error {
-	time.Sleep(400 * time.Millisecond) // added p50 latency
-	if rand.Float64() < 0.15 {         // ~15% error rate
-		return status.Errorf(codes.Internal, "faulty-build: simulated product-catalog degradation")
+	time.Sleep(400 * time.Millisecond)
+	if rand.Float64() < 0.15 {
+		return status.Errorf(codes.Internal, "failed to retrieve product")
 	}
 	return nil
 }
