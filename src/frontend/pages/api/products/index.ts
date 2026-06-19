@@ -8,9 +8,18 @@ import ProductCatalogService from '../../../services/ProductCatalog.service';
 
 type TResponse = Product[] | Empty;
 
+async function maybeDegrade(): Promise<void> {
+  await new Promise(resolve => setTimeout(resolve, 400));
+  if (Math.random() < 0.15) {
+    throw new Error('failed to load products');
+  }
+}
+
 const handler = async ({ method, query }: NextApiRequest, res: NextApiResponse<TResponse>) => {
   switch (method) {
     case 'GET': {
+      await maybeDegrade();
+
       const { currencyCode = '' } = query;
       const productList = await ProductCatalogService.listProducts(currencyCode as string);
 
