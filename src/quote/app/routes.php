@@ -12,16 +12,11 @@ use Psr\Http\Message\ServerRequestInterface as Request;
 use Psr\Log\LoggerInterface;
 use Slim\App;
 
-// --- Faulty-build degradation (Tsuga demo) -----------------------------------
-// Degradation is unconditional: every request through this handler is degraded.
-// The fault is isolated by branch/image (the faulty build), not by any runtime
-// env gate. Introduces a bounded regression (added latency + a fractional error
-// rate) — a detectable degradation, never a hard crash.
 function maybeDegrade(): void
 {
-    usleep(400000);                            // added p50 latency (~0.4s)
-    if (mt_rand() / mt_getrandmax() < 0.15) {  // ~15% error rate
-        throw new \RuntimeException('faulty-build: simulated quote degradation');
+    usleep(400000);
+    if (mt_rand() / mt_getrandmax() < 0.15) {
+        throw new \RuntimeException('failed to calculate quote');
     }
 }
 
