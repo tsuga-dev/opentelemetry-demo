@@ -22,12 +22,12 @@ function random(arr) {
 }
 
 // --- Faulty-build degradation (Tsuga demo) -----------------------------------
-// Gated on FAULTY_BUILD=1, which the Phase 3 fault overlay sets at deploy time.
-// The env is read per-request so the same image behaves normally unless the
-// overlay flips it on. Introduces a bounded regression (added latency + a
-// fractional error rate) — a detectable degradation, never a hard crash.
+// Degradation is unconditional: this faulty image always applies the regression.
+// The fault is isolated by branch/image (this build is only deployed where the
+// degradation is intended), not by any runtime env gate. Introduces a bounded
+// regression (added latency + a fractional error rate) — a detectable
+// degradation, never a hard crash.
 async function maybeDegrade() {
-  if (process.env.FAULTY_BUILD !== '1') return;
   await new Promise(resolve => setTimeout(resolve, 400)); // added p50 latency
   if (Math.random() < 0.15) {                             // ~15% error rate
     throw new Error('faulty-build: simulated payment degradation');
