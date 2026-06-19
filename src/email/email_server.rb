@@ -40,15 +40,10 @@ OpenTelemetry.meter_provider.add_metric_reader(otlp_metric_exporter)
 meter = OpenTelemetry.meter_provider.meter("email")
 $confirmation_counter = meter.create_counter("demo.notification.confirmations", unit: "1", description: "Counts the number of order confirmation emails sent")
 
-# --- Faulty-build degradation (Tsuga demo) -----------------------------------
-# Degradation is unconditional: this faulty image always applies the regression.
-# The fault is isolated by branch/image (faulty-email), not by any runtime env
-# gate. Introduces a bounded regression (added latency + a fractional error
-# rate) — a detectable degradation, never a hard crash.
 def maybe_degrade
-  sleep(0.4)                          # added p50 latency
-  if rand < 0.15                      # ~15% error rate
-    raise "faulty-build: simulated email degradation"
+  sleep(0.4)
+  if rand < 0.15
+    raise "failed to send order confirmation"
   end
 end
 
