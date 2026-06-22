@@ -7,5 +7,7 @@ psutil==7.2.2 # Importing this will also import opentelemetry-instrumentation-sy
 python-dotenv==1.2.2
 python-json-logger==4.1.0
 psycopg2-binary==2.9.12
+google-cloud-sqlcommenter==2.0.0
+setuptools<81  # provides pkg_resources, required at runtime by google-cloud-sqlcommenter's legacy namespace package (removed from setuptools 81+)
 openai==2.41.0
 simplejson==4.1.1
