@@ -9,8 +9,9 @@ import simplejson as json
 
 # Postgres
 import psycopg2
+from opentelemetry.instrumentation.psycopg2 import Psycopg2Instrumentor
 
-from google.cloud.sqlcommenter.psycopg2.extension import CommenterCursorFactory
+Psycopg2Instrumentor().instrument(enable_commenter=True)
 
 def must_map_env(key: str):
     value = os.environ.get(key)
@@ -31,10 +32,8 @@ def fetch_product_reviews_from_db(request_product_id):
 
     connection = None
 
-    cursor_factory = CommenterCursorFactory(with_opentelemetry=True,with_db_driver=True)
-
     try:
-        with psycopg2.connect(db_connection_str, cursor_factory=cursor_factory) as connection:
+        with psycopg2.connect(db_connection_str) as connection:
 
             with connection.cursor() as cursor:
                 # Define the SQL query
