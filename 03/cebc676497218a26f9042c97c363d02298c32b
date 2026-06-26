@@ -1,0 +1,12 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "03cebc676497218a26f9042c97c363d02298c32b",
+  "prompts": {},
+  "humans": {
+    "h_c48f198b8665b9": {
+      "author": "Nicolas Narbais <nicolas.narbais@gmail.com>"
+    }
+  }
+}
