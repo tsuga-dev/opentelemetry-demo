@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Copyright The OpenTelemetry Authors
+# SPDX-License-Identifier: Apache-2.0
 set -euo pipefail
 
 # Keep the `faulty` branch up to date with `main` (which carries upstream syncs)
