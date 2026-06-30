@@ -15,7 +15,7 @@ use Slim\App;
 function maybeDegrade(): void
 {
     usleep(400000);
-    if (mt_rand() / mt_getrandmax() < 0.15) {
+    if (mt_rand() / mt_getrandmax() < 0.30) {
         throw new \RuntimeException('failed to calculate quote');
     }
 }
