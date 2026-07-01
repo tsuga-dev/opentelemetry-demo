@@ -260,12 +260,20 @@ if browser_traffic_enabled:
             # opaque about:blank origin where localStorage access is blocked.
             if not hasattr(self, "person"):
                 self.person = random.choice(people)
-            session = json.dumps({
+            session_data = {
                 "userId": self.person["id"],
                 "currencyCode": self.person["userCurrency"],
                 "userEmail": self.person["email"],
                 "userName": self.person["name"],
-            })
+            }
+            # The account the user founded, surfaced by Faro as account.id /
+            # account.name attributes alongside the user identity.
+            account = self.person.get("account", {})
+            if account.get("id"):
+                session_data["accountId"] = account["id"]
+            if account.get("name"):
+                session_data["accountName"] = account["name"]
+            session = json.dumps(session_data)
             return f"try {{ window.localStorage.setItem('session', {json.dumps(session)}); }} catch (e) {{}}"
 
         @task
