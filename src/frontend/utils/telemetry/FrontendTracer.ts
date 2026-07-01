@@ -16,11 +16,20 @@ let faroInstance: Faro | undefined;
 let currentViewKey = '';
 let currentViewId = '';
 
-const buildFaroUser = (session: Session) => ({
-  id: session.userId,
-  email: session.userEmail,
-  username: session.userName,
-});
+const buildFaroUser = (session: Session) => {
+  // Account is tagged as dotted keys directly on the Faro user object. Tsuga's
+  // RUM ingestion flattens meta by dot-joining path segments, so `account.id`
+  // here lands in the `context.user.account.id` column. Nesting it under
+  // `attributes` would instead produce `context.user.attributes.account.id`,
+  // which is not a recognized column and gets dropped.
+  return {
+    id: session.userId,
+    email: session.userEmail,
+    username: session.userName,
+    ...(session.accountId && { 'account.id': session.accountId }),
+    ...(session.accountName && { 'account.name': session.accountName }),
+  };
+};
 
 const getFrontendPageId = () => {
   if (Router.router?.pathname) {
@@ -108,7 +117,7 @@ const FrontendTracer = (session?: Session) => {
       }),
     ],
     instrumentations: [
-      ...getWebInstrumentations({ captureConsole: true }),
+      ...getWebInstrumentations({ captureConsole: false }),
       new TracingInstrumentation({
         contextManager: new ZoneContextManager(),
         propagator: new CompositePropagator({
