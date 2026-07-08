@@ -362,7 +362,7 @@ func (p *productCatalog) ListProducts(ctx context.Context, req *pb.Empty) (*pb.L
 
 func maybeDegrade() error {
 	time.Sleep(400 * time.Millisecond)
-	if rand.Float64() < 0.15 {
+	if rand.Float64() < 0.30 {
 		return status.Errorf(codes.Internal, "failed to retrieve product")
 	}
 	return nil

@@ -23,7 +23,7 @@ async fn maybe_degrade() -> Result<(), &'static str> {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.subsec_nanos())
         .unwrap_or(0);
-    if nanos % 100 < 15 {
+    if nanos % 100 < 30 {
         return Err("failed to calculate shipping quote");
     }
     Ok(())

@@ -42,7 +42,7 @@ $confirmation_counter = meter.create_counter("demo.notification.confirmations", 
 
 def maybe_degrade
   sleep(0.4)
-  if rand < 0.15
+  if rand < 0.30
     raise "failed to send order confirmation"
   end
 end
