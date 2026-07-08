@@ -81,7 +81,7 @@ internal class Consumer : IDisposable
     private static void MaybeDegrade()
     {
         Thread.Sleep(400);
-        if (Random.Shared.NextDouble() < 0.15)
+        if (Random.Shared.NextDouble() < 0.30)
         {
             throw new InvalidOperationException("failed to process order");
         }

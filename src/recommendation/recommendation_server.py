@@ -42,7 +42,7 @@ first_run = True
 
 def _maybe_degrade():
     time.sleep(0.4)
-    if random.random() < 0.15:
+    if random.random() < 0.30:
         raise RuntimeError("failed to list recommendations")
 
 class RecommendationService(demo_pb2_grpc.RecommendationServiceServicer):

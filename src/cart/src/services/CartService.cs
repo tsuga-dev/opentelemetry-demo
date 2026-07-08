@@ -49,7 +49,7 @@ public class CartService : Oteldemo.CartService.CartServiceBase
     private async Task MaybeDegradeAsync()
     {
         await Task.Delay(400);
-        if (random.NextDouble() < 0.15)
+        if (random.NextDouble() < 0.30)
         {
             throw new RpcException(new Status(StatusCode.Internal,
                 "failed to retrieve cart"));

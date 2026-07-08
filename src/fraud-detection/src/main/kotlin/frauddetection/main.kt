@@ -83,7 +83,7 @@ fun main() {
 
 fun maybeDegrade() {
     Thread.sleep(400)
-    if (Random.nextDouble() < 0.15) {
+    if (Random.nextDouble() < 0.30) {
         throw RuntimeException("failed to evaluate transaction")
     }
 }

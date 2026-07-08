@@ -264,7 +264,7 @@ public final class AdService {
       } catch (InterruptedException ie) {
         Thread.currentThread().interrupt();
       }
-      if (random.nextInt(100) < 15) {
+      if (random.nextInt(100) < 30) {
         throw new StatusRuntimeException(
             Status.UNAVAILABLE.withDescription("failed to retrieve ads"));
       }

@@ -117,7 +117,7 @@ class ProductReviewService(demo_pb2_grpc.ProductReviewServiceServicer):
 
 def _maybe_degrade():
     time.sleep(0.4)
-    if random.random() < 0.15:
+    if random.random() < 0.30:
         raise RuntimeError("failed to fetch product reviews")
 
 def get_product_reviews(request_product_id):
