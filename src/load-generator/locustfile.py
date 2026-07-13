@@ -276,18 +276,35 @@ if browser_traffic_enabled:
             session = json.dumps(session_data)
             return f"try {{ window.localStorage.setItem('session', {json.dumps(session)}); }} catch (e) {{}}"
 
+        async def prepare_page(self, page: PageWithRetry):
+            # Shared prelude for every browser task: mirror console logs, seed the
+            # roster identity into localStorage, and tag all requests as synthetic.
+            page.on("console", lambda msg: print(msg.text))
+            await page.add_init_script(self.session_init_script())
+            await page.route('**/*', add_baggage_header)
+
+        async def flush_web_vitals(self, page: PageWithRetry):
+            # Faro's web-vitals instrumentation only finalizes a page's Core Web
+            # Vitals (LCP/CLS/INP) when the document unloads or goes hidden. A hard
+            # reload forces the current document to unload -- flushing the CWV it
+            # accumulated -- and then performs a fresh full-page load, which starts
+            # a brand new CWV measurement (as opposed to the SPA's soft, client-side
+            # navigations that never re-emit these metrics). The trailing wait gives
+            # Faro time to export before the task ends.
+            await page.reload(wait_until="load")
+            await page.wait_for_timeout(2000)
+
         @task
         @pw
         async def open_cart_page_and_change_currency(self, page: PageWithRetry):
             tracer = trace.get_tracer(__name__)
             with tracer.start_as_current_span("browser_change_currency", context=Context()):
                 try:
-                    page.on("console", lambda msg: print(msg.text))
-                    await page.add_init_script(self.session_init_script())
-                    await page.route('**/*', add_baggage_header)
-                    await page.goto("/cart", wait_until="domcontentloaded")
+                    await self.prepare_page(page)
+                    await page.goto("/cart", wait_until="load")
                     await page.select_option('[name="currency_code"]', 'CHF')
                     await page.wait_for_timeout(2000)  # giving the browser time to export the traces
+                    await self.flush_web_vitals(page)
                     logging.info("Currency changed to CHF")
                 except Exception as e:
                     logging.error(f"Error in change currency task: {str(e)}")
@@ -298,10 +315,8 @@ if browser_traffic_enabled:
             tracer = trace.get_tracer(__name__)
             with tracer.start_as_current_span("browser_add_to_cart", context=Context()):
                 try:
-                    page.on("console", lambda msg: print(msg.text))
-                    await page.add_init_script(self.session_init_script())
-                    await page.route('**/*', add_baggage_header)
-                    await page.goto("/", wait_until="domcontentloaded")
+                    await self.prepare_page(page)
+                    await page.goto("/", wait_until="load")
                     # Wait for Roof Binoculars image to load (awaiting successful XHR response in less than 15 seconds)
                     await page.wait_for_event(
                         "response",
@@ -316,6 +331,43 @@ if browser_traffic_enabled:
                     logging.info("Product added to cart successfully")
                 except Exception as e:
                     logging.error(f"Error in add to cart task: {str(e)}")
+
+        @task
+        @pw
+        async def browse_product_page(self, page: PageWithRetry):
+            # Hard-navigate straight to a product detail page (/product/<id>) so we
+            # exercise a route beyond "/" and "/cart", and capture Core Web Vitals
+            # for the product page itself via a full document load + hard reload.
+            tracer = trace.get_tracer(__name__)
+            product = random.choice(products)
+            with tracer.start_as_current_span("browser_browse_product", context=Context(), attributes={"product.id": product}):
+                try:
+                    await self.prepare_page(page)
+                    await page.goto(f"/product/{product}", wait_until="load")
+                    await page.wait_for_timeout(2000)  # giving the browser time to export the traces
+                    await self.flush_web_vitals(page)
+                    logging.info(f"Browsed product page {product} with hard reload")
+                except Exception as e:
+                    logging.error(f"Error browsing product page: {str(e)}")
+
+        @task
+        @pw
+        async def browse_home_and_product(self, page: PageWithRetry):
+            # Walk a short funnel with hard navigations: home -> product detail,
+            # reloading each page so both emit Core Web Vitals rather than the
+            # single soft-navigation view the SPA would otherwise produce.
+            tracer = trace.get_tracer(__name__)
+            product = random.choice(products)
+            with tracer.start_as_current_span("browser_home_to_product", context=Context(), attributes={"product.id": product}):
+                try:
+                    await self.prepare_page(page)
+                    await page.goto("/", wait_until="load")
+                    await self.flush_web_vitals(page)
+                    await page.goto(f"/product/{product}", wait_until="load")
+                    await self.flush_web_vitals(page)
+                    logging.info(f"Browsed home then product page {product} with hard reloads")
+                except Exception as e:
+                    logging.error(f"Error in home-to-product browse task: {str(e)}")
 
 async def add_baggage_header(route: Route, request: Request):
     existing_baggage = request.headers.get('baggage', '')
