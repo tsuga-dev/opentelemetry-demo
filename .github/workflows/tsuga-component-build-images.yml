@@ -236,7 +236,19 @@ jobs:
             || aws ecr describe-repositories --repository-names "$REPO" >/dev/null
           aws ecr put-lifecycle-policy \
             --repository-name "$REPO" \
-            --lifecycle-policy-text '{"rules":[{"rulePriority":1,"description":"Expire untagged images older than 7 days","selection":{"tagStatus":"untagged","countType":"sinceImagePushed","countUnit":"days","countNumber":7},"action":{"type":"expire"}}]}' >/dev/null
+            --lifecycle-policy-text '{
+              "rules": [{
+                "rulePriority": 1,
+                "description": "Expire untagged images older than 7 days",
+                "selection": {
+                  "tagStatus": "untagged",
+                  "countType": "sinceImagePushed",
+                  "countUnit": "days",
+                  "countNumber": 7
+                },
+                "action": {"type": "expire"}
+              }]
+            }' >/dev/null
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2.0.1
