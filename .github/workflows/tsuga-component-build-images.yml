@@ -215,9 +215,40 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v5.1.1
         with:
-          role-to-assume: arn:aws:iam::014498635196:role/opentelemetry-demo-github
+          role-to-assume: arn:aws:iam::259033777210:role/demo-services-github
           aws-region: ${{ env.AWS_REGION }}
         if: ${{ inputs.push }}
+      # The ECR repo is not Pulumi-managed — the push role is scoped to the
+      # tsuga-dev/* namespace so this workflow provisions it on first push.
+      - name: Ensure ECR repository exists
+        if: ${{ inputs.push }}
+        env:
+          REPO: ${{ env.ECR_REPOSITORY }}
+        run: |
+          set -euo pipefail
+          if aws ecr describe-repositories --repository-names "$REPO" >/dev/null 2>&1; then
+            exit 0
+          fi
+          # Matrix jobs run in parallel and can race; losing the race is fine as
+          # long as the repo exists afterwards. Tags stay mutable (unlike the
+          # demo-services repos) because every build also pushes `latest-<suffix>`.
+          aws ecr create-repository --repository-name "$REPO" >/dev/null \
+            || aws ecr describe-repositories --repository-names "$REPO" >/dev/null
+          aws ecr put-lifecycle-policy \
+            --repository-name "$REPO" \
+            --lifecycle-policy-text '{
+              "rules": [{
+                "rulePriority": 1,
+                "description": "Expire untagged images older than 7 days",
+                "selection": {
+                  "tagStatus": "untagged",
+                  "countType": "sinceImagePushed",
+                  "countUnit": "days",
+                  "countNumber": 7
+                },
+                "action": {"type": "expire"}
+              }]
+            }' >/dev/null
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2.0.1
