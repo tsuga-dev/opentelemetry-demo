@@ -11,7 +11,9 @@ const flagProvider = new FlagdProvider();
 const logger = require('./logger');
 const tracer = trace.getTracer('payment');
 const meter = metrics.getMeter('payment');
-const transactionsCounter = meter.createCounter('demo.payment.transactions');
+const transactionsCounter = meter.createCounter('demo.payment.transactions', {
+  unit: '{transaction}',
+});
 
 const LOYALTY_LEVEL = ['platinum', 'gold', 'silver', 'bronze'];
 
@@ -25,6 +27,13 @@ module.exports.charge = async request => {
   const span = tracer.startSpan('charge');
 
   try {
+    const baggage = propagation.getBaggage(context.active());
+    const syntheticRequest = baggage?.getEntry('synthetic_request')?.value === 'true';
+
+    if (syntheticRequest) {
+      span.setAttribute('user_agent.synthetic.type', 'test');
+    }
+
     await OpenFeature.setProviderAndWait(flagProvider);
 
     const numberVariant = await OpenFeature.getClient().getNumberValue("paymentFailure", 0);
@@ -71,9 +80,8 @@ module.exports.charge = async request => {
       throw new Error(`The credit card (ending ${lastFourDigits}) expired on ${month}/${year}.`);
     }
 
-    // Check baggage for synthetic_request=true, and add charged attribute accordingly
-    const baggage = propagation.getBaggage(context.active());
-    if (baggage && baggage.getEntry('synthetic_request') && baggage.getEntry('synthetic_request').value === 'true') {
+    // Do not charge synthetic requests.
+    if (syntheticRequest) {
       span.setAttribute('demo.payment.charged', false);
     } else {
       span.setAttribute('demo.payment.charged', true);

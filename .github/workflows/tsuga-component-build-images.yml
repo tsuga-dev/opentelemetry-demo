@@ -9,6 +9,11 @@ on:
         default: false
         required: false
         type: boolean
+      publish_latest:
+        description: Also publish latest-<service> aliases
+        default: true
+        required: false
+        type: boolean
       version:
         description: The version used when tagging the image
         default: 'dev'
@@ -29,6 +34,11 @@ on:
       push:
         description: Should the images be pushed
         default: false
+        required: false
+        type: boolean
+      publish_latest:
+        description: Also publish latest-<service> aliases
+        default: true
         required: false
         type: boolean
       version:
@@ -60,7 +70,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          persist-credentials: false
       - name: Generate
         run: make clean docker-generate-protobuf
       - name: Check Clean Work Tree
@@ -90,10 +102,18 @@ jobs:
             tag_suffix: ad
             context: ./
             setup-qemu: true
+          - file: ./src/agent/Dockerfile
+            tag_suffix: agent
+            context: ./
+            setup-qemu: true
           - file: ./src/cart/src/Dockerfile
             tag_suffix: cart
             context: ./
             setup-qemu: false
+          - file: ./src/chatbot/Dockerfile
+            tag_suffix: chatbot
+            context: ./
+            setup-qemu: true
           - file: ./src/checkout/Dockerfile
             tag_suffix: checkout
             context: ./
@@ -134,12 +154,16 @@ jobs:
             tag_suffix: kafka
             context: ./
             setup-qemu: true
-          - file: ./src/llm/Dockerfile
-            tag_suffix: llm
-            context: ./
-            setup-qemu: true
           - file: ./src/load-generator/Dockerfile
             tag_suffix: load-generator
+            context: ./
+            setup-qemu: true
+          - file: ./src/opamp-server/Dockerfile
+            tag_suffix: opamp-server
+            context: ./
+            setup-qemu: true
+          - file: ./src/mcp/Dockerfile
+            tag_suffix: mcp
             context: ./
             setup-qemu: true
           - file: ./src/opensearch/Dockerfile
@@ -152,10 +176,6 @@ jobs:
             setup-qemu: true
           - file: ./src/product-catalog/Dockerfile
             tag_suffix: product-catalog
-            context: ./
-            setup-qemu: true
-          - file: ./src/product-reviews/Dockerfile
-            tag_suffix: product-reviews
             context: ./
             setup-qemu: true
           - file: ./src/quote/Dockerfile
@@ -174,21 +194,18 @@ jobs:
             tag_suffix: telemetry-docs
             context: ./
             setup-qemu: true
-          - file: ./test/tracetesting/Dockerfile
-            tag_suffix: traceBasedTests
-            context: ./
-            setup-qemu: true
 
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
           fetch-depth: 0
+          persist-credentials: false
       - name: Load environment variables from .env file
         run: |
           if [ -f .env ]; then
             # Filter out comments and empty lines, then add each variable to $GITHUB_ENV
             grep -vE '^\s*#|^\s*$' .env | while read -r line; do
-              echo "$line" >> $GITHUB_ENV
+              echo "$line" >> "$GITHUB_ENV"
             done
           else
             echo ".env file not found!"
@@ -197,15 +214,24 @@ jobs:
       - name: Check for changes and set push options
         id: check_changes
         env:
-          PUSH_BEFORE_SHA: ${{ github.event.before }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          DOCKERFILE: ${{ matrix.file_tag.file }}
+          FORCE_PUSH: ${{ inputs.push }}
+          HEAD_SHA: ${{ github.sha }}
         run: |
-          DOCKERFILE_DIR=$(dirname ${{ matrix.file_tag.file }})
-          FILES_CHANGED=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }} -- $DOCKERFILE_DIR)
-          FORCE_PUSH=${{ inputs.push }}
           if [ "$FORCE_PUSH" = true ]; then
             echo "Force push is enabled, proceeding with build."
             echo "skip=false" >> "$GITHUB_OUTPUT"
-          elif [ -z "$FILES_CHANGED" ]; then
+            exit 0
+          fi
+          if ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+            echo "No usable base SHA is available, proceeding with build."
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          DOCKERFILE_DIR=$(dirname "$DOCKERFILE")
+          FILES_CHANGED=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- "$DOCKERFILE_DIR")
+          if [ -z "$FILES_CHANGED" ]; then
             echo "No changes in ${{ matrix.file_tag.context }}, skipping build."
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
@@ -254,32 +280,56 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v2.0.1
         if: ${{ inputs.push }}
       - name: Log in to the Container registry
-        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121  # v4.1.0
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0  # v4.4.0
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
         if: ${{ inputs.push }}
       - name: Log in to Docker Hub
-        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121  # v4.1.0
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0  # v4.4.0
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
         if: ${{ inputs.push && !github.event.repository.fork }}
       - name: Set up QEMU
         if: ${{ matrix.file_tag.setup-qemu }}
-        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a  # v4.0.0
+        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8  # v4.2.0
         with:
           image: tonistiigi/binfmt:master
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd  # v4.0.0
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c  # v4.2.0
         with:
           buildkitd-config-inline: |
             [worker.oci]
             max-parallelism = 2
+      - name: Set image tags
+        id: image-tags
+        if: steps.check_changes.outputs.skip == 'false'
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          GHCR_REPOSITORY: ${{ inputs.ghcr_repo }}
+          PUBLISH_LATEST: ${{ inputs.publish_latest }}
+          TAG_SUFFIX: ${{ matrix.file_tag.tag_suffix }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          {
+            echo 'tags<<EOF'
+            if [ -n "${ECR_REGISTRY}" ]; then
+              echo "${ECR_REGISTRY}/${ECR_REPOSITORY}:${VERSION}-${TAG_SUFFIX}"
+            fi
+            echo "${GHCR_REPOSITORY}:${VERSION}-${TAG_SUFFIX}"
+            if [ "${PUBLISH_LATEST}" = "true" ]; then
+              if [ -n "${ECR_REGISTRY}" ]; then
+                echo "${ECR_REGISTRY}/${ECR_REPOSITORY}:latest-${TAG_SUFFIX}"
+              fi
+              echo "${GHCR_REPOSITORY}:latest-${TAG_SUFFIX}"
+            fi
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
       - name: Matrix Build and push demo images
         if: steps.check_changes.outputs.skip == 'false'
-        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f  # v7.1.0
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a  # v7.3.0
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         with:
@@ -290,12 +340,6 @@ jobs:
           build-args: |
             OTEL_JAVA_AGENT_VERSION=${{ env.OTEL_JAVA_AGENT_VERSION }}
             OPENTELEMETRY_CPP_VERSION=${{ env.OPENTELEMETRY_CPP_VERSION }}
-            TRACETEST_IMAGE_VERSION=${{ env.TRACETEST_IMAGE_VERSION }}
-            OPENSEARCH_IMAGE=${{ env.OPENSEARCH_IMAGE }}
-          tags: |
-            ${{env.ECR_REGISTRY}}/${{env.ECR_REPOSITORY}}:${{ inputs.version }}-${{ matrix.file_tag.tag_suffix }}
-            ${{env.ECR_REGISTRY}}/${{env.ECR_REPOSITORY}}:latest-${{ matrix.file_tag.tag_suffix }}
-            ${{ inputs.ghcr_repo }}:${{ inputs.version }}-${{ matrix.file_tag.tag_suffix }}
-            ${{ inputs.ghcr_repo }}:latest-${{ matrix.file_tag.tag_suffix }}
+          tags: ${{ steps.image-tags.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha
