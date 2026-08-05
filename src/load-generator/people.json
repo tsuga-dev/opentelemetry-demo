@@ -3,6 +3,10 @@
         "id": "8cb230a9",
         "name": "Larry & Sergei",
         "email": "larry_sergei@example.com",
+        "account": {
+            "id": "google",
+            "name": "Google"
+        },
         "address": {
             "streetAddress": "1600 Amphitheatre Parkway",
             "zipCode": "94043",
@@ -22,6 +26,10 @@
         "id": "efd50e82",
         "name": "Bill",
         "email": "bill@example.com",
+        "account": {
+            "id": "microsoft",
+            "name": "Microsoft"
+        },
         "address": {
             "streetAddress": "One Microsoft Way",
             "zipCode": "98052",
@@ -41,6 +49,10 @@
         "id": "06fe49fe",
         "name": "Steve",
         "email": "steve@example.com",
+        "account": {
+            "id": "apple",
+            "name": "Apple"
+        },
         "address": {
             "streetAddress": "One Apple Park Way",
             "zipCode": "95014",
@@ -60,6 +72,10 @@
         "id": "88b95176",
         "name": "Mark",
         "email": "mark@example.com",
+        "account": {
+            "id": "meta",
+            "name": "Meta"
+        },
         "address": {
             "streetAddress": "1 Hacker Way",
             "zipCode": "94025",
@@ -79,6 +95,10 @@
         "id": "0bee94ad",
         "name": "Jeff",
         "email": "jeff@example.com",
+        "account": {
+            "id": "amazon",
+            "name": "Amazon"
+        },
         "address": {
             "streetAddress": "410 Terry Ave N",
             "zipCode": "98109",
@@ -98,6 +118,10 @@
         "id": "2584542b",
         "name": "Reed",
         "email": "reed@example.com",
+        "account": {
+            "id": "netflix",
+            "name": "Netflix"
+        },
         "address": {
             "streetAddress": "100 Winchester Circle",
             "zipCode": "95032",
@@ -117,6 +141,10 @@
         "id": "de213313",
         "name": "Tobias",
         "email": "tobias@example.com",
+        "account": {
+            "id": "shopify",
+            "name": "Shopify"
+        },
         "address": {
             "streetAddress": "150 Elgin St",
             "zipCode": "K2P1L4",
@@ -136,6 +164,10 @@
         "id": "a9b2bf6d",
         "name": "Jack",
         "email": "jack@example.com",
+        "account": {
+            "id": "twitter",
+            "name": "Twitter"
+        },
         "address": {
             "streetAddress": "1355 Market St",
             "zipCode": "94103",
@@ -155,6 +187,10 @@
         "id": "8aa31216",
         "name": "Moore",
         "email": "moore@example.com",
+        "account": {
+            "id": "intel",
+            "name": "Intel"
+        },
         "address": {
             "streetAddress": "2200 Mission College Blvd",
             "zipCode": "95054",

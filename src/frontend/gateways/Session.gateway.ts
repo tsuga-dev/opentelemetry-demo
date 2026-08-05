@@ -8,6 +8,8 @@ interface ISession {
   currencyCode: string;
   userEmail: string;
   userName: string;
+  accountId?: string;
+  accountName?: string;
 }
 
 const sessionKey = 'session';
@@ -23,12 +25,16 @@ const hydrateSession = (session: Partial<ISession>): ISession => {
   const userId = session.userId || v4();
   const userEmail = session.userEmail?.trim() || `${getDefaultUserLabel(userId)}@example.com`;
   const userName = session.userName?.trim() || getUserNameFromEmail(userEmail) || getDefaultUserLabel(userId);
+  const accountId = session.accountId?.trim() || undefined;
+  const accountName = session.accountName?.trim() || undefined;
 
   return {
     userId,
     currencyCode: session.currencyCode || 'USD',
     userEmail,
     userName,
+    ...(accountId && { accountId }),
+    ...(accountName && { accountName }),
   };
 };
 
@@ -85,7 +91,9 @@ const isValid = (session: unknown): session is ISession => {
     typeof (session as ISession).userId === 'string' &&
     typeof (session as ISession).currencyCode === 'string' &&
     (typeof (session as ISession).userEmail === 'undefined' || typeof (session as ISession).userEmail === 'string') &&
-    (typeof (session as ISession).userName === 'undefined' || typeof (session as ISession).userName === 'string')
+    (typeof (session as ISession).userName === 'undefined' || typeof (session as ISession).userName === 'string') &&
+    (typeof (session as ISession).accountId === 'undefined' || typeof (session as ISession).accountId === 'string') &&
+    (typeof (session as ISession).accountName === 'undefined' || typeof (session as ISession).accountName === 'string')
   );
 };
 

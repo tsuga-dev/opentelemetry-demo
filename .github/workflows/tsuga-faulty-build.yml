@@ -20,5 +20,6 @@ jobs:
     uses: ./.github/workflows/tsuga-component-build-images.yml
     with:
       push: true
-      version: faulty
+      publish_latest: false
+      version: faulty-v3
     secrets: inherit

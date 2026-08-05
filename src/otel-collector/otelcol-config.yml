@@ -5,7 +5,7 @@
 # Exports only to the debug exporter by default.
 # Layer additional configs on top with --config to add exporters:
 #   otelcol-config-full.yml        adds Kafka and PostgreSQL metric receivers
-#   otelcol-config-observability.yml  adds Jaeger, Prometheus, OpenSearch exporters
+#   otelcol-config-observability.yml  adds observability exporters and OpAMP status reporting
 #   otelcol-config-extras.yml      extras/customizations (empty stub)
 
 receivers:
@@ -19,6 +19,10 @@ receivers:
           allowed_origins:
             - "http://*"
             - "https://*"
+          allowed_headers:
+            - "content-type"
+            - "traceparent"
+            - "baggage"
   http_check/frontend-proxy:
     targets:
       - endpoint: http://${env:FRONTEND_PROXY_ADDR}
@@ -187,6 +191,10 @@ processors:
           # Upstream Issue: https://github.com/open-telemetry/opentelemetry-collector/issues/15221
           - set(attributes["otelcol_signal"], attributes["otelcol.signal"]) where attributes["otelcol.signal"] != nil and not IsMap(attributes["otelcol.signal"])
           - delete_key(attributes, "otelcol.signal") where attributes["otelcol_signal"] != nil
+  gen_ai_normalizer:
+    sources:
+      - name: openllmetry
+
   transform/sanitize_spans:
     error_mode: ignore
     trace_statements:
@@ -240,7 +248,7 @@ service:
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [resourcedetection, memory_limiter, transform/sanitize_spans]
+      processors: [resourcedetection, memory_limiter, transform/sanitize_spans, gen_ai_normalizer]
       exporters: [debug, span_metrics]
     metrics:
       receivers: [docker_stats, http_check/frontend-proxy, host_metrics, nginx, otlp, redis, postgresql, prometheus/ad, span_metrics]
@@ -252,7 +260,7 @@ service:
       exporters: [debug]
     profiles:
       receivers: [otlp]
-      processors: [filter/sanitize_profiles, memory_limiter]
+      processors: [resourcedetection, filter/sanitize_profiles, memory_limiter]
       exporters: [debug]
   telemetry:
     metrics:
