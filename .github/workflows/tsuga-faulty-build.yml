@@ -22,4 +22,13 @@ jobs:
       push: true
       publish_latest: false
       version: faulty-v3
+      # Only the services that carry a fault patch on this branch. Everything
+      # else in the shared matrix is identical to the healthy build, so
+      # rebuilding it here just burns runners and lets an unrelated service
+      # fail the faulty run. Derive with:
+      #   git diff --name-only <upstream-sync> faulty -- src/ | cut -d/ -f2 | sort -u
+      # Keep in sync with demo-gitops fault/services.yaml.
+      only_suffixes: >-
+        accounting ad cart checkout currency email fraud-detection frontend
+        payment product-catalog quote recommendation shipping
     secrets: inherit
