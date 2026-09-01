@@ -19,6 +19,7 @@ exclude = [
   "^https://www\\.npmjs\\.com",
   "^https://www\\.robotstxt\\.org",
   "^https://community\\.splunk\\.com",
+  "^https://cloud-native\\.slack\\.com",
   "^https://hub\\.docker\\.com/r/otel/demo",
 ]
 
