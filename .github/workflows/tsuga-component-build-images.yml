@@ -14,6 +14,14 @@ on:
         default: 'dev'
         required: false
         type: string
+      only_suffixes:
+        description: >-
+          Space-separated tag suffixes to build. Empty (the default) builds the
+          whole matrix; anything listed here restricts the build to those
+          services and skips the rest.
+        default: ''
+        required: false
+        type: string
       dockerhub_repo:
         description: Docker Hub repository
         default: 'otel/demo'
@@ -34,6 +42,14 @@ on:
       version:
         description: The version used when tagging the image
         default: 'dev'
+        required: false
+        type: string
+      only_suffixes:
+        description: >-
+          Space-separated tag suffixes to build. Empty (the default) builds the
+          whole matrix; anything listed here restricts the build to those
+          services and skips the rest.
+        default: ''
         required: false
         type: string
       dockerhub_repo:
@@ -197,15 +213,42 @@ jobs:
       - name: Check for changes and set push options
         id: check_changes
         env:
-          PUSH_BEFORE_SHA: ${{ github.event.before }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          DOCKERFILE: ${{ matrix.file_tag.file }}
+          FORCE_PUSH: ${{ inputs.push }}
+          HEAD_SHA: ${{ github.sha }}
+          ONLY_SUFFIXES: ${{ inputs.only_suffixes }}
+          TAG_SUFFIX: ${{ matrix.file_tag.tag_suffix }}
         run: |
-          DOCKERFILE_DIR=$(dirname ${{ matrix.file_tag.file }})
-          FILES_CHANGED=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }} -- $DOCKERFILE_DIR)
-          FORCE_PUSH=${{ inputs.push }}
+          # An allowlist means "build only these services". It is checked before
+          # the force-push and change-detection paths so a listed-only build
+          # cannot be re-enabled by either. The faulty build uses this so only
+          # services that actually carry a fault patch get rebuilt.
+          if [ -n "$ONLY_SUFFIXES" ]; then
+            case " $ONLY_SUFFIXES " in
+              *" $TAG_SUFFIX "*)
+                echo "$TAG_SUFFIX is in the build allowlist."
+                ;;
+              *)
+                echo "$TAG_SUFFIX is not in the build allowlist, skipping build."
+                echo "skip=true" >> "$GITHUB_OUTPUT"
+                exit 0
+                ;;
+            esac
+          fi
           if [ "$FORCE_PUSH" = true ]; then
             echo "Force push is enabled, proceeding with build."
             echo "skip=false" >> "$GITHUB_OUTPUT"
-          elif [ -z "$FILES_CHANGED" ]; then
+            exit 0
+          fi
+          if ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+            echo "No usable base SHA is available, proceeding with build."
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          DOCKERFILE_DIR=$(dirname "$DOCKERFILE")
+          FILES_CHANGED=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- "$DOCKERFILE_DIR")
+          if [ -z "$FILES_CHANGED" ]; then
             echo "No changes in ${{ matrix.file_tag.context }}, skipping build."
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
