@@ -9,6 +9,18 @@ time, `make chlog-update VERSION=x.x.x` folds those fragments into a new
 version section directly below the marker and deletes them.
 
 <!-- next version -->
+## Unreleased
+
+* [shipping] Emit frame pointers and line tables in release builds so eBPF
+  profilers can resolve application frames
+* [react-native-app] Fix `SessionGateway.setSessionValue` to await `getSession()`,
+  preventing stored session corruption and loss of `userId`
+  ([#3765](https://github.com/open-telemetry/opentelemetry-demo/issues/3765))
+* [cart] Report health to the demo's OpAMP server when running with the
+  observability stack.
+  ([#3656](https://github.com/open-telemetry/opentelemetry-demo/pull/3656))
+* [react-native-app] Render missing `City` and `State` input fields in `CheckoutForm`
+  ([#3754](https://github.com/open-telemetry/opentelemetry-demo/issues/3754))
 
 ## 3.0.0
 
