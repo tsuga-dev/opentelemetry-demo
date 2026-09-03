@@ -38,3 +38,7 @@ features = [
     "fast-rng",          # Use a faster (but still sufficiently random) RNG
     "macro-diagnostics", # Enable better diagnostics for compile-time UUIDs
 ]
+
+[profile.release]
+# Without debug info the eBPF profiler resolves no application frame.
+debug = "line-tables-only"
