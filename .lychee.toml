@@ -21,6 +21,7 @@ exclude = [
   "^https://community\\.splunk\\.com",
   "^https://cloud-native\\.slack\\.com",
   "^https://hub\\.docker\\.com/r/otel/demo",
+  "^https://cloud-native\\.slack\\.com",
 ]
 
 exclude_path = [
