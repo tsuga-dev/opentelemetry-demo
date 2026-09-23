@@ -9,6 +9,7 @@ import { TracingInstrumentation } from '@grafana/faro-web-tracing';
 import Router from 'next/router';
 import SessionGateway from '../../gateways/Session.gateway';
 import frontendPackage from '../../package.json';
+import { installClickTracking } from './RumEvents';
 
 type Session = ReturnType<typeof SessionGateway.getSession>;
 
@@ -137,6 +138,7 @@ const FrontendTracer = (session?: Session) => {
   });
 
   faroInstance.metas.add(getFrontendPageMeta);
+  installClickTracking();
 
   return faroInstance;
 };
