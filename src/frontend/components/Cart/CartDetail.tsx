@@ -10,6 +10,7 @@ import SessionGateway from '../../gateways/Session.gateway';
 import { useCart } from '../../providers/Cart.provider';
 import { useCurrency } from '../../providers/Currency.provider';
 import FrontendTracer from '../../utils/telemetry/FrontendTracer';
+import { countBucket, pushRumEvent, RumEvent } from '../../utils/telemetry/RumEvents';
 import * as S from '../../styles/Cart.styled';
 
 const CartDetail = () => {
@@ -34,6 +35,7 @@ const CartDetail = () => {
       creditCardExpirationYear,
       creditCardNumber,
     }: IFormData) => {
+      pushRumEvent(RumEvent.CheckoutSubmit, { surface: 'cart', currency: selectedCurrency });
       const session = SessionGateway.setUserEmail(email);
       FrontendTracer(session);
 
@@ -56,12 +58,17 @@ const CartDetail = () => {
         },
       });
 
+      pushRumEvent(RumEvent.PurchaseCompleted, {
+        currency: selectedCurrency,
+        item_count_bucket: countBucket(items.length),
+      });
+
       push({
         pathname: `/cart/checkout/${order.orderId}`,
         query: { order: JSON.stringify(order) },
       });
     },
-    [placeOrder, push, selectedCurrency]
+    [items.length, placeOrder, push, selectedCurrency]
   );
 
   return (
@@ -69,7 +76,13 @@ const CartDetail = () => {
       <div>
         <S.Header>
           <S.CarTitle>Shopping Cart</S.CarTitle>
-          <S.EmptyCartButton onClick={emptyCart} $type="link">
+          <S.EmptyCartButton
+            onClick={() => {
+              pushRumEvent(RumEvent.CartEmpty, { surface: 'cart' });
+              emptyCart();
+            }}
+            $type="link"
+          >
             Empty Cart
           </S.EmptyCartButton>
         </S.Header>
