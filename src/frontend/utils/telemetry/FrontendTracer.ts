@@ -113,6 +113,9 @@ const FrontendTracer = (session?: Session) => {
     },
     ignoreUrls: [NEXT_PUBLIC_FARO_URL],
     trackResources: true,
+    experimental: {
+      trackNavigation: true,
+    },
     pageTracking: {
       generatePageId: getFrontendPageId,
     },
@@ -155,6 +158,7 @@ const FrontendTracer = (session?: Session) => {
         maskInputOptions: { password: true },
         // Faro's default masks all text ('*'); undefined disables text masking so replays stay readable.
         maskTextSelector: undefined,
+        inlineStylesheet: true,
         blockSelector: '.faro-replay-blocked',
       }),
     ],
