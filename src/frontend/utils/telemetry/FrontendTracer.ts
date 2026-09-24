@@ -12,6 +12,7 @@ import {
   LogLevel,
   type Faro,
 } from '@grafana/faro-web-sdk';
+import { ReplayInstrumentation } from '@grafana/faro-instrumentation-replay';
 import { TracingInstrumentation } from '@grafana/faro-web-tracing';
 import Router from 'next/router';
 import SessionGateway from '../../gateways/Session.gateway';
@@ -145,6 +146,14 @@ const FrontendTracer = (session?: Session) => {
             applyCustomAttributesOnSpan: setPageId,
           },
         },
+      }),
+      new ReplayInstrumentation({
+        samplingRate: 1,
+        inactivityThresholdMs: 0,
+        recordCanvas: true,
+        maskAllInputs: false,
+        maskInputOptions: { password: true },
+        blockSelector: '.faro-replay-blocked',
       }),
     ],
   });
