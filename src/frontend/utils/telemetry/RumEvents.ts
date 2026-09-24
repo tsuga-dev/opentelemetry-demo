@@ -42,7 +42,14 @@ export const pushRumEvent = (name: RumEvent, attributes: Record<string, string> 
 
 const INTERACTIVE_SELECTOR = 'button, a, summary, [role="button"], [role="menuitem"], [role="tab"], [role="option"]';
 
-const clean = (value: string | null | undefined) => value?.trim() || undefined;
+// Lowercases and collapses every run of non-alphanumeric characters into a single dash, e.g. "Place Order" -> "place-order".
+const toKebabCase = (value: string) =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+const clean = (value: string | null | undefined) => (value ? toKebabCase(value) : '') || undefined;
 
 const getClickLabel = (element: HTMLElement) => {
   const label =

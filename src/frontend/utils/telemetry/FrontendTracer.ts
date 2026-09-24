@@ -4,7 +4,14 @@
 import type { Span } from '@opentelemetry/api';
 import { CompositePropagator, W3CBaggagePropagator, W3CTraceContextPropagator } from '@opentelemetry/core';
 import { ZoneContextManager } from '@opentelemetry/context-zone';
-import { FetchTransport, getWebInstrumentations, initializeFaro, type Faro } from '@grafana/faro-web-sdk';
+import {
+  ConsoleInstrumentation,
+  FetchTransport,
+  getWebInstrumentations,
+  initializeFaro,
+  LogLevel,
+  type Faro,
+} from '@grafana/faro-web-sdk';
 import { TracingInstrumentation } from '@grafana/faro-web-tracing';
 import Router from 'next/router';
 import SessionGateway from '../../gateways/Session.gateway';
@@ -76,7 +83,6 @@ const FrontendTracer = (session?: Session) => {
 
   const currentSession = session ?? SessionGateway.getSession();
   if (faroInstance) {
-    faroInstance.api.setSession({ id: currentSession.userId });
     faroInstance.api.setUser(buildFaroUser(currentSession));
     return faroInstance;
   }
@@ -91,20 +97,26 @@ const FrontendTracer = (session?: Session) => {
     return undefined;
   }
 
+  ConsoleInstrumentation.defaultDisabledLevels = [
+    LogLevel.DEBUG,
+    LogLevel.INFO,
+    LogLevel.LOG,
+    LogLevel.WARN,
+    LogLevel.TRACE,
+  ];
+
   faroInstance = initializeFaro({
     app: {
       name: NEXT_PUBLIC_FARO_APP_NAME || 'frontend-web',
       version: frontendPackage.version,
     },
     ignoreUrls: [NEXT_PUBLIC_FARO_URL],
+    trackResources: true,
     pageTracking: {
       generatePageId: getFrontendPageId,
     },
     sessionTracking: {
-      session: {
-        id: currentSession.userId,
-      },
-      generateSessionId: () => currentSession.userId,
+      persistent: true,
     },
     user: buildFaroUser(currentSession),
     transports: [
@@ -118,7 +130,7 @@ const FrontendTracer = (session?: Session) => {
       }),
     ],
     instrumentations: [
-      ...getWebInstrumentations({ captureConsole: false }),
+      ...getWebInstrumentations(),
       new TracingInstrumentation({
         contextManager: new ZoneContextManager(),
         propagator: new CompositePropagator({

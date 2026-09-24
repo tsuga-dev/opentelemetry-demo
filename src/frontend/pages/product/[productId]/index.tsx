@@ -20,8 +20,10 @@ import { useCart } from '../../../providers/Cart.provider';
 import * as S from '../../../styles/ProductDetail.styled';
 import { useCurrency } from '../../../providers/Currency.provider';
 import { countBucket, pushRumEvent, RumEvent } from '../../../utils/telemetry/RumEvents';
+import { getPromotionLabel } from '../../../utils/Promotions';
 
 const quantityOptions = new Array(10).fill(0).map((_, i) => i + 1);
+const PROMOTION_ERROR_RATE = 0.1;
 
 const ProductDetail: NextPage = () => {
   const { push, query } = useRouter();
@@ -35,6 +37,12 @@ const ProductDetail: NextPage = () => {
 
   useEffect(() => {
     setQuantity(1);
+  }, [productId]);
+
+  useEffect(() => {
+    if (!productId || Math.random() >= PROMOTION_ERROR_RATE) return;
+    // Deliberate fault that feeds RUM Errors: products without a promotion throw a TypeError. setTimeout keeps it outside React rendering so the page still works.
+    setTimeout(() => getPromotionLabel(productId));
   }, [productId]);
 
   const {
