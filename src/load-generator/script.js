@@ -315,6 +315,48 @@ async function flushWebVitals(page) {
     await page.waitForTimeout(2000)
 }
 
+// ---- browser visits ---------------------------------------------------------
+
+const VISIT_MIN_MS = 10 * 60 * 1000
+const VISIT_MAX_MS = 30 * 60 * 1000
+
+// The browser VU plays one returning visitor at a time. Carrying localStorage
+// across iterations keeps Faro's persisted session alive, so one RUM session
+// spans the whole visit instead of a single iteration.
+let visit = null
+
+function currentVisit() {
+    if (!visit || Date.now() >= visit.endsAt) {
+        const person = randomChoice(people)
+        const session = JSON.stringify({
+            userId: person.id,
+            currencyCode: person.userCurrency,
+            userEmail: person.email,
+            userName: person.name,
+            accountId: person.account.id,
+            accountName: person.account.name,
+        })
+        visit = {
+            person,
+            id: uuid4(),
+            endsAt: Date.now() + VISIT_MIN_MS + cryptoRandom() * (VISIT_MAX_MS - VISIT_MIN_MS),
+            storage: [['session', session]],
+        }
+    }
+    return visit
+}
+
+// Init scripts run on every navigation, reloads included; the sessionStorage
+// guard restores once per tab so Faro's in-page session updates are kept.
+function restoreStorageScript(storage) {
+    return `try {
+        if (!sessionStorage.getItem('k6-visit-restored')) {
+            for (const [key, value] of ${JSON.stringify(storage)}) localStorage.setItem(key, value)
+            sessionStorage.setItem('k6-visit-restored', '1')
+        }
+    } catch (_) {}`
+}
+
 // ---- browser entrypoint -----------------------------------------------------
 
 export async function browserScenario() {
@@ -323,22 +365,14 @@ export async function browserScenario() {
         return
     }
 
-    const person = randomChoice(people)
-    const browserSessionId = uuid4()
-    const session = JSON.stringify({
-        userId: person.id,
-        currencyCode: person.userCurrency,
-        userEmail: person.email,
-        userName: person.name,
-        accountId: person.account.id,
-        accountName: person.account.name,
-    })
+    const activeVisit = currentVisit()
+    const { person } = activeVisit
     const context = await browser.newContext({
         extraHTTPHeaders: {
-            baggage: `synthetic_request=true,session.id=${browserSessionId},enduser.id=${person.id}`,
+            baggage: `synthetic_request=true,session.id=${activeVisit.id},enduser.id=${person.id}`,
         },
     })
-    await context.addInitScript(`try { localStorage.setItem('session', ${JSON.stringify(session)}); } catch (_) {}`)
+    await context.addInitScript(restoreStorageScript(activeVisit.storage))
     const page = await context.newPage()
     const browserTasks = [
         { name: 'browser_change_currency', run: changeCurrency },
@@ -355,6 +389,11 @@ export async function browserScenario() {
         console.error(`browser task error: ${e}`)
     } finally {
         span.end()
+        try {
+            activeVisit.storage = await page.evaluate(() => Object.entries(localStorage))
+        } catch (e) {
+            console.error(`browser storage capture error: ${e}`)
+        }
         await page.close()
         await context.close()
     }
