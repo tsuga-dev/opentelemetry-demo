@@ -153,6 +153,8 @@ const FrontendTracer = (session?: Session) => {
         recordCanvas: true,
         maskAllInputs: false,
         maskInputOptions: { password: true },
+        // Faro's default masks all text ('*'); undefined disables text masking so replays stay readable.
+        maskTextSelector: undefined,
         blockSelector: '.faro-replay-blocked',
       }),
     ],
