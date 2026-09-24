@@ -71,3 +71,10 @@ scenario's own `browser` options field, which k6 ignores for these.
 Browser iterations seed the same named identity into frontend local storage and
 exercise the home, cart, and product routes. Hard reloads flush Faro Core Web
 Vitals before each browser task completes.
+
+The chatbot scenario runs one VU that asks the chatbot one of its sample
+questions every 10-30 seconds, through the same Gradio `respond` endpoint the
+chat UI calls. It is opt-in via `K6_CHATBOT_ENABLED` (default off), which
+`compose.agent.yaml` turns on because the chatbot only exists in that layer.
+The sample questions have recorded answers in the agent's VCR cassettes, so
+with `USE_VCR=True` this traffic doesn't need LLM access.

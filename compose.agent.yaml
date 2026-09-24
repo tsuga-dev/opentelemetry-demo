@@ -128,3 +128,8 @@ services:
     depends_on:
       chatbot:
         condition: service_started
+
+  # Patch load-generator to ask the chatbot its sample questions
+  load-generator:
+    environment:
+      - K6_CHATBOT_ENABLED=true
