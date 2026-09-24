@@ -16,6 +16,7 @@ const FLAGD_OFREP_PORT = __ENV.FLAGD_OFREP_PORT || '8016'
 // README.md). The browser scenario runs a single headless browser session
 // alongside the HTTP traffic; it stays opt-in via K6_BROWSER_ENABLED.
 const browserEnabled = (__ENV.K6_BROWSER_ENABLED || '').toLowerCase() === 'true'
+const chatbotEnabled = (__ENV.K6_CHATBOT_ENABLED || '').toLowerCase() === 'true'
 
 export const options = {
     scenarios: {
@@ -38,6 +39,14 @@ export const options = {
                         // executablePath/args come from env vars, not this field - see README.md.
                     },
                 },
+            },
+        } : {}),
+        ...(chatbotEnabled ? {
+            chatbot: {
+                executor: 'constant-vus',
+                exec: 'chatbotScenario',
+                vus: 1,
+                duration: __ENV.K6_DURATION || '9999h',
             },
         } : {}),
     },
@@ -399,4 +408,44 @@ export async function browserScenario() {
     }
 
     sleep(cryptoRandom() * 9 + 1)
+}
+
+// ---- chatbot entrypoint -----------------------------------------------------
+
+// The chatbot's sample questions, which the agent answers from its VCR cassettes.
+const chatbotQuestions = [
+    'Show all available products in the store.',
+    'What currencies are supported by the Astronomy Shop?',
+    'What current promotions are available on binoculars?',
+]
+
+// Drives the Gradio `respond` endpoint the chat textbox submits to: the POST
+// queues the call and the GET streams its result until the agent answers.
+export function chatbotScenario() {
+    if (getFlagdValue('loadGeneratorTraffic') <= 0) {
+        sleep(cryptoRandom() * 9 + 1)
+        return
+    }
+
+    if (sessionId === null) {
+        onStart()
+    }
+
+    const question = randomChoice(chatbotQuestions)
+    const span = tracer.startSpan('user_ask_chatbot', { 'user.id': sessionPerson.id })
+    span.log(`User ${sessionPerson.id} asking chatbot: ${question}`)
+    const res = http.post(
+        `${BASE_URL}/chatbot/gradio_api/call/respond`,
+        JSON.stringify({ data: [question, []] }),
+        { headers: otelHeaders(span.traceParent(), { 'Content-Type': 'application/json' }) }
+    )
+    if (res.status === 200) {
+        http.get(
+            `${BASE_URL}/chatbot/gradio_api/call/respond/${JSON.parse(res.body).event_id}`,
+            { headers: otelHeaders(span.traceParent()), timeout: '300s' }
+        )
+    }
+    span.end()
+
+    sleep(cryptoRandom() * 20 + 10)
 }
