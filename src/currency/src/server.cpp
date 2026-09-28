@@ -210,11 +210,13 @@ class CurrencyService final : public oteldemo::CurrencyService::Service
     span->AddEvent("Processing currency conversion request");
 
     if (MaybeDegrade()) {
+      const char *env_message = std::getenv("FAULT_ERROR_MESSAGE");
+      const std::string message = env_message ? env_message : "currency conversion failed";
       span->AddEvent("Currency conversion failed");
       span->SetStatus(StatusCode::kError);
-      logger->Error(std::string(__func__) + " currency conversion failed");
+      logger->Error(message);
       span->End();
-      return Status(grpc::StatusCode::INTERNAL, "currency conversion failed");
+      return Status(grpc::StatusCode::INTERNAL, message);
     }
 
     try {

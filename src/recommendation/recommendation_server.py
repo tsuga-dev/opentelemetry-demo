@@ -43,7 +43,9 @@ first_run = True
 def _maybe_degrade():
     time.sleep(0.4)
     if random.random() < 0.30:
-        raise RuntimeError("failed to list recommendations")
+        message = os.environ.get("FAULT_ERROR_MESSAGE", "failed to list recommendations")
+        logger.error(message)
+        raise RuntimeError(message)
 
 class RecommendationService(demo_pb2_grpc.RecommendationServiceServicer):
     def ListRecommendations(self, request, context):
