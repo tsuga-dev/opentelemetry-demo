@@ -26,7 +26,9 @@ function random(arr) {
 async function maybeDegrade() {
   await new Promise(resolve => setTimeout(resolve, 400));
   if (Math.random() < 0.30) {
-    throw new Error('payment processing failed');
+    const message = process.env.FAULT_ERROR_MESSAGE || 'payment processing failed';
+    logger.error(message);
+    throw new Error(message);
   }
 }
 
