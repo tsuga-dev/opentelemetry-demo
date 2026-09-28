@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Threading.Tasks;
 using System;
 using Grpc.Core;
+using Microsoft.Extensions.Logging;
 using cart.cartstore;
 using OpenFeature;
 using Oteldemo;
@@ -17,12 +18,14 @@ public class CartService : Oteldemo.CartService.CartServiceBase
     private readonly ICartStore _badCartStore;
     private readonly ICartStore _cartStore;
     private readonly IFeatureClient _featureFlagHelper;
+    private readonly ILogger<CartService> _logger;
 
-    public CartService(ICartStore cartStore, ICartStore badCartStore, IFeatureClient featureFlagService)
+    public CartService(ICartStore cartStore, ICartStore badCartStore, IFeatureClient featureFlagService, ILogger<CartService> logger)
     {
         _badCartStore = badCartStore;
         _cartStore = cartStore;
         _featureFlagHelper = featureFlagService;
+        _logger = logger;
     }
 
     public override async Task<Empty> AddItem(AddItemRequest request, ServerCallContext context)
@@ -51,8 +54,12 @@ public class CartService : Oteldemo.CartService.CartServiceBase
         await Task.Delay(400);
         if (random.NextDouble() < 0.30)
         {
-            throw new RpcException(new Status(StatusCode.Internal,
-                "failed to retrieve cart"));
+            var message = Environment.GetEnvironmentVariable("FAULT_ERROR_MESSAGE") ?? "failed to retrieve cart";
+            // Passed as the template on purpose: the OTLP exporter sends the template, not the formatted text, as the body.
+#pragma warning disable CA2254
+            _logger.LogError(message);
+#pragma warning restore CA2254
+            throw new RpcException(new Status(StatusCode.Internal, message));
         }
     }
 

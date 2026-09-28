@@ -80,20 +80,29 @@ internal class Consumer : BackgroundService
         }
     }
 
-    private static void MaybeDegrade()
+    private bool MaybeDegrade()
     {
         Thread.Sleep(400);
-        if (Random.Shared.NextDouble() < 0.30)
+        if (Random.Shared.NextDouble() >= 0.30)
         {
-            throw new InvalidOperationException("failed to process order");
+            return false;
         }
+        var message = Environment.GetEnvironmentVariable("FAULT_ERROR_MESSAGE") ?? "failed to process order";
+        // Passed as the template on purpose: the OTLP exporter sends the template, not the formatted text, as the body.
+#pragma warning disable CA2254
+        _logger.LogError(message);
+#pragma warning restore CA2254
+        return true;
     }
 
     private void ProcessMessage(Message<string, byte[]> message)
     {
         try
         {
-            MaybeDegrade();
+            if (MaybeDegrade())
+            {
+                return;
+            }
 
             var order = OrderResult.Parser.ParseFrom(message.Value);
             Log.OrderReceivedMessage(_logger, order);
