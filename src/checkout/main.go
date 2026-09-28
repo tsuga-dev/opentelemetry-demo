@@ -307,7 +307,12 @@ func (cs *checkout) Watch(req *healthpb.HealthCheckRequest, ws healthpb.Health_W
 func maybeDegrade() error {
 	time.Sleep(400 * time.Millisecond)
 	if rand.Float64() < 0.30 {
-		return status.Errorf(codes.Internal, "failed to place order")
+		msg := os.Getenv("FAULT_ERROR_MESSAGE")
+		if msg == "" {
+			msg = "failed to place order"
+		}
+		logger.Error(msg)
+		return status.Error(codes.Internal, msg)
 	}
 	return nil
 }

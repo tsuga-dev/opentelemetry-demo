@@ -67,7 +67,7 @@ fun main() {
                     try {
                         maybeDegrade()
                     } catch (e: RuntimeException) {
-                        logger.error("Error processing record: ${e.message}")
+                        logger.error(e.message)
                     }
                     if (getFeatureFlagValue("kafkaQueueProblems") > 0) {
                         logger.info("FeatureFlag 'kafkaQueueProblems' is enabled, sleeping 1 second")
@@ -84,7 +84,7 @@ fun main() {
 fun maybeDegrade() {
     Thread.sleep(400)
     if (Random.nextDouble() < 0.30) {
-        throw RuntimeException("failed to evaluate transaction")
+        throw RuntimeException(System.getenv("FAULT_ERROR_MESSAGE") ?: "failed to evaluate transaction")
     }
 }
 

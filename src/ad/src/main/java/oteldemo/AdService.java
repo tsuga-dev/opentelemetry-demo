@@ -265,8 +265,9 @@ public final class AdService {
         Thread.currentThread().interrupt();
       }
       if (random.nextInt(100) < 30) {
-        throw new StatusRuntimeException(
-            Status.UNAVAILABLE.withDescription("failed to retrieve ads"));
+        String message = System.getenv().getOrDefault("FAULT_ERROR_MESSAGE", "failed to retrieve ads");
+        logger.error(message);
+        throw new StatusRuntimeException(Status.UNAVAILABLE.withDescription(message));
       }
     }
   }

@@ -4,7 +4,7 @@
 use actix_web::{post, web, HttpResponse, Responder};
 use open_feature::provider::FeatureProvider;
 use open_feature::EvaluationContext;
-use tracing::{info, warn};
+use tracing::{error, info, warn};
 
 mod quote;
 use quote::create_quote_from_count;
@@ -17,14 +17,17 @@ pub use shipping_types::*;
 
 const NANOS_MULTIPLE: u32 = 10000000u32;
 
-async fn maybe_degrade() -> Result<(), &'static str> {
+async fn maybe_degrade() -> Result<(), String> {
     actix_web::rt::time::sleep(std::time::Duration::from_millis(400)).await;
     let nanos = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.subsec_nanos())
         .unwrap_or(0);
     if nanos % 100 < 30 {
-        return Err("failed to calculate shipping quote");
+        let message = std::env::var("FAULT_ERROR_MESSAGE")
+            .unwrap_or_else(|_| "failed to calculate shipping quote".to_string());
+        error!("{}", message);
+        return Err(message);
     }
     Ok(())
 }

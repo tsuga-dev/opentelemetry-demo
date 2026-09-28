@@ -5,6 +5,8 @@ const opentelemetry = require('@opentelemetry/sdk-node');
 const {getNodeAutoInstrumentations} = require('@opentelemetry/auto-instrumentations-node');
 const {OTLPTraceExporter} = require('@opentelemetry/exporter-trace-otlp-grpc');
 const {OTLPMetricExporter} = require('@opentelemetry/exporter-metrics-otlp-grpc');
+const {OTLPLogExporter} = require('@opentelemetry/exporter-logs-otlp-grpc');
+const {BatchLogRecordProcessor} = require('@opentelemetry/sdk-logs');
 const {PeriodicExportingMetricReader} = require('@opentelemetry/sdk-metrics');
 const {alibabaCloudEcsDetector} = require('@opentelemetry/resource-detector-alibaba-cloud');
 const {awsEc2Detector, awsEksDetector} = require('@opentelemetry/resource-detector-aws');
@@ -25,6 +27,7 @@ const sdk = new opentelemetry.NodeSDK({
   metricReader: new PeriodicExportingMetricReader({
     exporter: new OTLPMetricExporter(),
   }),
+  logRecordProcessors: [new BatchLogRecordProcessor(new OTLPLogExporter())],
   resourceDetectors: [
     containerDetector,
     envDetector,
