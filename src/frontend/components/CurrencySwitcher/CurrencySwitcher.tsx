@@ -6,6 +6,7 @@ import getSymbolFromCurrency from 'currency-symbol-map';
 import { useCurrency } from '../../providers/Currency.provider';
 import * as S from './CurrencySwitcher.styled';
 import { CypressFields } from '../../utils/enums/CypressFields';
+import { pushRumEvent, RumEvent } from '../../utils/telemetry/RumEvents';
 
 const CurrencySwitcher = () => {
   const { currencyCodeList, setSelectedCurrency, selectedCurrency } = useCurrency();
@@ -18,7 +19,10 @@ const CurrencySwitcher = () => {
         <S.SelectedConcurrency>{currencySymbol}</S.SelectedConcurrency>
         <S.Select
           name="currency_code"
-          onChange={(event: { target: { value: string; }; }) => setSelectedCurrency(event.target.value)}
+          onChange={(event: { target: { value: string; }; }) => {
+            pushRumEvent(RumEvent.CurrencyChange, { surface: 'header', currency: event.target.value });
+            setSelectedCurrency(event.target.value);
+          }}
           value={selectedCurrency}
           data-cy={CypressFields.CurrencySwitcher}
         >

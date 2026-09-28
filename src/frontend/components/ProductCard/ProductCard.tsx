@@ -4,6 +4,7 @@
 import { CypressFields } from '../../utils/enums/CypressFields';
 import { Product } from '../../protos/demo';
 import ProductPrice from '../ProductPrice';
+import { pushRumEvent, RumEvent } from '../../utils/telemetry/RumEvents';
 import * as S from './ProductCard.styled';
 import { useState, useEffect } from 'react';
 import { useNumberFlagValue } from '@openfeature/react-sdk';
@@ -69,8 +70,8 @@ const ProductCard = ({
   }, [imageSlowLoad, picture]);
 
   return (
-    <S.Link href={`/product/${id}`}>
-      <S.ProductCard data-cy={CypressFields.ProductCard}>
+    <S.Link href={`/product/${id}`} data-rum-label="product-card">
+      <S.ProductCard data-cy={CypressFields.ProductCard} onClick={() => pushRumEvent(RumEvent.ProductView)}>
         <S.Image $src={imageSrc} />
         <div>
           <S.ProductName>{name}</S.ProductName>

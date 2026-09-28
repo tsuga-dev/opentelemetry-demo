@@ -22,6 +22,10 @@ WORKDIR /app/
 
 COPY /src/shipping/ /app/
 
+# Frame pointers let the eBPF profiler walk the stack; set here so both build
+# branches below inherit it.
+ENV RUSTFLAGS="-C force-frame-pointers=yes"
+
 # Build - cross-compile for ARM64 or native build
 RUN if [ "${TARGETPLATFORM}" = "linux/arm64" ] && [ "${BUILDPLATFORM}" != "linux/arm64" ] ; then \
         env CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
