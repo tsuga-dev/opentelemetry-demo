@@ -7,6 +7,8 @@ the release.
 
 ## Unreleased
 
+* [shipping] Emit frame pointers and line tables in release builds so eBPF
+  profilers can resolve application frames
 * [react-native-app] Fix `SessionGateway.setSessionValue` to await `getSession()`,
   preventing stored session corruption and loss of `userId`
   ([#3765](https://github.com/open-telemetry/opentelemetry-demo/issues/3765))

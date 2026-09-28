@@ -11,9 +11,10 @@
     "grpc:generate": "mkdir -p ./protos && protoc -I ./pb  --plugin=./node_modules/.bin/protoc-gen-ts_proto --ts_proto_opt=esModuleInterop=true --ts_proto_out=./protos --ts_proto_opt=outputServices=grpc-js demo.proto"
   },
   "dependencies": {
-    "@grafana/faro-web-sdk": "^2.7.1",
-    "@grafana/faro-web-tracing": "^2.7.1",
     "@bufbuild/protobuf": "^2.13.0",
+    "@grafana/faro-instrumentation-replay": "^2.11.0",
+    "@grafana/faro-web-sdk": "^2.11.0",
+    "@grafana/faro-web-tracing": "^2.11.0",
     "@grpc/grpc-js": "1.14.4",
     "@openfeature/flagd-provider": "0.16.0",
     "@openfeature/flagd-web-provider": "0.7.4",
@@ -67,6 +68,7 @@
   },
   "overrides": {
     "@cypress/request": "4.0.0",
+    "@grafana/faro-core": "2.11.0",
     "postcss": "8.5.14",
     "qs": "6.15.2"
   }
