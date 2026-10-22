@@ -296,9 +296,9 @@ async function addProductToCartBrowser(page) {
     await page.goto(`${BASE_URL}/`, { waitUntil: 'load' })
     await page.waitForSelector('a[href="/product/2ZYFJ3GM2N"]', { timeout: 15000 })
     await page.click('a[href="/product/2ZYFJ3GM2N"]')
-    await page.waitForLoadState('domcontentloaded')
+    // Client-side route change: domcontentloaded never fires again, so wait for the target element.
+    await page.waitForSelector('[data-cy="product-add-to-cart"]', { timeout: 25000 })
     await page.click('[data-cy="product-add-to-cart"]')
-    await page.waitForLoadState('domcontentloaded')
     await page.waitForTimeout(2000)
     await flushWebVitals(page)
 }
