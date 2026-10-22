@@ -12,9 +12,9 @@
   },
   "dependencies": {
     "@bufbuild/protobuf": "^2.15.0",
-    "@grafana/faro-instrumentation-replay": "^2.11.0",
-    "@grafana/faro-web-sdk": "^2.11.0",
-    "@grafana/faro-web-tracing": "^2.11.0",
+    "@grafana/faro-instrumentation-replay": "2.11.0",
+    "@grafana/faro-web-sdk": "2.11.0",
+    "@grafana/faro-web-tracing": "2.11.0",
     "@grpc/grpc-js": "1.14.6",
     "@openfeature/flagd-provider": "0.17.0",
     "@openfeature/flagd-web-provider": "0.8.0",
