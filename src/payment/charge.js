@@ -1,6 +1,7 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 const { context, propagation, trace, metrics, SpanStatusCode } = require('@opentelemetry/api');
+const { ATTR_ERROR_TYPE } = require('@opentelemetry/semantic-conventions');
 const cardValidator = require('simple-card-validator');
 const { v4: uuidv4 } = require('uuid');
 
@@ -48,6 +49,7 @@ module.exports.charge = async request => {
     await OpenFeature.setProviderAndWait(flagProvider);
 
     const numberVariant = await OpenFeature.getClient().getNumberValue("paymentFailure", 0);
+    const emitRawPii = await OpenFeature.getClient().getBooleanValue("emitRawPii", false);
 
     if (numberVariant > 0) {
       // n% chance to fail with demo.user_context.loyalty_level=gold
@@ -60,6 +62,7 @@ module.exports.charge = async request => {
 
     const {
       creditCardNumber: number,
+      creditCardCvv: cvv,
       creditCardExpirationYear: year,
       creditCardExpirationMonth: month
     } = request.creditCard;
@@ -76,7 +79,11 @@ module.exports.charge = async request => {
     span.setAttributes({
       'demo.payment.card_type': cardType,
       'demo.payment.card_valid': valid,
-      'demo.user_context.loyalty_level': loyalty_level
+      'demo.user_context.loyalty_level': loyalty_level,
+      ...(emitRawPii && {
+        'demo.payment.card_number': number,
+        'demo.payment.card_cvv': cvv
+      })
     });
 
     if (!valid) {
@@ -111,6 +118,7 @@ module.exports.charge = async request => {
   } catch (err) {
     span.recordException(err);
     span.setStatus({ code: SpanStatusCode.ERROR, message: err.message });
+    span.setAttribute(ATTR_ERROR_TYPE, err.name || 'Error');
 
     throw err;
   } finally {

@@ -43,7 +43,7 @@ RUN npm ci --omit=dev
 
 # -----------------------------------------------------------------------------
 
-FROM gcr.io/distroless/nodejs24-debian13:nonroot@sha256:fbbdda866ea71aef98c4abece17e3d61fbf820cc2ef3961522caa2478716171a
+FROM gcr.io/distroless/nodejs24-debian13:nonroot@sha256:59c479c9b8c123e66047315c968aa2d35e31ae5149c856e4110a79c8b3563f0b
 
 WORKDIR /app
 
@@ -56,6 +56,7 @@ COPY ./src/frontend/public/ public/
 
 COPY ./src/frontend/utils/telemetry/Instrumentation.js Instrumentation.js
 
+ARG FRONTEND_PORT=8080
 EXPOSE ${FRONTEND_PORT}
 
 CMD ["--require=./Instrumentation.js", "server.js"]
