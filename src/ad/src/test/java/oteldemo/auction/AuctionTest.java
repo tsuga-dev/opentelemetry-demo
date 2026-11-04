@@ -124,4 +124,21 @@ class AuctionTest {
     assertNull(Auction.fromEnv("", null));
     assertNull(Auction.fromEnv(null, null));
   }
+
+  @Test
+  void fromEnvMalformedUrlIsNull() {
+    assertNull(Auction.fromEnv("http://bad host:8080", null));
+  }
+
+  @Test
+  void fromEnvBadDeadlineFallsBack() {
+    Auction auction = Auction.fromEnv("http://localhost:8080", "abc");
+    assertEquals(Duration.ofMillis(100), auction.deadline());
+  }
+
+  @Test
+  void fromEnvOnlySeparatorsIsNull() {
+    assertNull(Auction.fromEnv(",", null));
+    assertNull(Auction.fromEnv(" , ", null));
+  }
 }

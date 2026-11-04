@@ -36,17 +36,33 @@ public final class Auction {
     if (bidderUrls == null || bidderUrls.isBlank()) {
       return null;
     }
-    List<URI> bidders =
-        Arrays.stream(bidderUrls.split(","))
-            .map(String::trim)
-            .filter(s -> !s.isEmpty())
-            .map(URI::create)
-            .toList();
-    long ms =
-        deadlineMs == null || deadlineMs.isBlank()
-            ? DEFAULT_DEADLINE_MS
-            : Long.parseLong(deadlineMs.trim());
-    return new Auction(bidders, Duration.ofMillis(ms), HttpClient.newHttpClient());
+    List<URI> bidders;
+    try {
+      bidders =
+          Arrays.stream(bidderUrls.split(","))
+              .map(String::trim)
+              .filter(s -> !s.isEmpty())
+              .map(URI::create)
+              .toList();
+    } catch (IllegalArgumentException e) {
+      return null;
+    }
+    if (bidders.isEmpty()) {
+      return null;
+    }
+    return new Auction(bidders, Duration.ofMillis(parseDeadlineMs(deadlineMs)), HttpClient.newHttpClient());
+  }
+
+  private static long parseDeadlineMs(String deadlineMs) {
+    try {
+      return Long.parseLong(deadlineMs.trim());
+    } catch (RuntimeException e) {
+      return DEFAULT_DEADLINE_MS;
+    }
+  }
+
+  Duration deadline() {
+    return deadline;
   }
 
   public AuctionResult run(int richness, List<String> contextKeys, boolean bidderSlow) {
