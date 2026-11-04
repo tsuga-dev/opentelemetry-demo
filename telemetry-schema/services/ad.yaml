@@ -16,3 +16,11 @@ attribute_groups:
       - ref: demo.ad.category
       - ref: session.id
       - ref: enduser.id
+      - ref: demo.ad.profile.level
+      - ref: demo.ad.profile.cpu_time
+      - ref: demo.ad.profile.cost
+      - ref: demo.ad.auction.bidders.count
+      - ref: demo.ad.auction.bids.count
+      - ref: demo.ad.auction.winner
+      - ref: demo.ad.auction.winning_bid
+      - ref: demo.ad.auction.loss

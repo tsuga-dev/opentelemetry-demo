@@ -39,3 +39,51 @@ attributes:
     stability: stable
     note: Indicates whether the ad response was targeted or random
     examples: ["TARGETED", "RANDOM"]
+  - key: demo.ad.profile.level
+    type: string
+    brief: Visitor profile enrichment level
+    stability: development
+    note: The profile level applied to the ad request, derived from the adProfileLevel feature flag
+    examples: ["low", "extreme"]
+  - key: demo.ad.profile.cpu_time
+    type: double
+    brief: CPU time spent building the visitor profile
+    stability: development
+    note: CPU time in seconds spent by the ad service building the visitor profile for the request
+    examples: [0.002, 0.05]
+  - key: demo.ad.profile.cost
+    type: double
+    brief: Cost of building the visitor profile
+    stability: development
+    note: Cost in USD of the CPU time spent building the visitor profile, computed from AD_PROFILE_COST_PER_CPU_SECOND
+    examples: [0.0003, 0.0075]
+  - key: demo.ad.auction.bidders.count
+    type: int
+    brief: Number of bidders in the ad auction
+    stability: development
+    note: The count of bidder services invited to the ad auction
+    examples: [0, 3]
+  - key: demo.ad.auction.bids.count
+    type: int
+    brief: Number of bids received in the ad auction
+    stability: development
+    note: The count of valid bids received before the auction deadline
+    examples: [0, 2]
+  - key: demo.ad.auction.winner
+    type: string
+    brief: Winning bidder of the ad auction
+    stability: development
+    note: The name of the bidder that won the ad auction, or an empty string when the spot was unsold
+    examples: ["bidder-astro", ""]
+  - key: demo.ad.auction.winning_bid
+    type: double
+    brief: Winning bid of the ad auction
+    stability: development
+    note: The winning bid amount in USD, or 0 when the spot was unsold
+    examples: [0.0, 0.0034]
+  - key: demo.ad.auction.loss
+    type: boolean
+    brief: Whether the ad auction was lost
+    stability: development
+    note: True when the auction did not produce a winning bid for the ad spot
+    examples: [true, false]
