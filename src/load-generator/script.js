@@ -115,8 +115,11 @@ function otelHeaders(traceParent, extra) {
 
 // ---- per-VU session state ---------------------------------------------------
 
+const SESSION_ITERATIONS = 20
+
 let sessionId = null
 let sessionPerson = null
+let sessionIterations = 0
 
 function onStart() {
     sessionId = uuid4()
@@ -141,6 +144,7 @@ function browseProduct() {
     const span = tracer.startSpan('user_browse_product', { 'product.id': product })
     span.log(`User browsing product: ${product}`)
     http.get(`${BASE_URL}/api/products/${product}`, { headers: otelHeaders(span.traceParent()) })
+    fetchAds(randomChoice(categories), span.traceParent())
     span.end()
 }
 
@@ -155,15 +159,19 @@ function getRecommendations() {
     span.end()
 }
 
-function getAds() {
-    const category = randomChoice(categories)
-    const span = tracer.startSpan('user_get_ads', { category: String(category) })
-    span.log(`User getting ads for category: ${category}`)
+function fetchAds(category, traceParent) {
     // When category is null, Locust sends contextKeys=None (Python str(None)).
     const url = category !== null
         ? `${BASE_URL}/api/data/?contextKeys=${category}`
         : `${BASE_URL}/api/data/?contextKeys=None`
-    http.get(url, { headers: otelHeaders(span.traceParent()) })
+    http.get(url, { headers: otelHeaders(traceParent) })
+}
+
+function getAds() {
+    const category = randomChoice(categories)
+    const span = tracer.startSpan('user_get_ads', { category: String(category) })
+    span.log(`User getting ads for category: ${category}`)
+    fetchAds(category, span.traceParent())
     span.end()
 }
 
@@ -275,6 +283,12 @@ export function httpScenario() {
     }
 
     selectTask()()
+
+    sessionIterations++
+    if (sessionIterations >= SESSION_ITERATIONS) {
+        sessionId = null
+        sessionIterations = 0
+    }
 
     sleep(cryptoRandom() * 9 + 1)  // mirrors Locust between(1, 10)
 }
