@@ -83,7 +83,7 @@ attributes:
     examples: [0.0, 0.0034]
   - key: demo.ad.auction.loss
     type: boolean
-    brief: Whether the ad auction was lost
+    brief: Whether the ad spot was sold at a loss
     stability: development
-    note: True when the auction did not produce a winning bid for the ad spot
+    note: True when the visitor profile cost is greater than the winning bid, so the ad spot was sold at a loss. An unsold spot has a winning bid of 0, so it counts as a loss whenever the profile cost is greater than 0
     examples: [true, false]
