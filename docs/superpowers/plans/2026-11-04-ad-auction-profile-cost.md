@@ -259,3 +259,21 @@ Use `tsugactx use demo`, restore the previous context at the end.
 - [ ] **Step 3: Cross-check**: profiler CPU seconds for `*profileLevel*` frames (samples / 20) vs sum of `demo.ad.profile.cpu_time` over the same window → within ~30%.
 - [ ] **Step 4: Recalibrate if needed**: if per-unit CPU on the cluster is far from 2 ms, change `AD_PROFILE_COST_PER_CPU_SECOND` in app-values (regenerate overlay, ask before pushing) rather than rebuilding the image.
 - [ ] **Step 5:** Report numbers to Antonin. The Tsuga dashboard (spec's 7 widgets) is built next via `tsuga-build-assets`, with his confirmation per asset.
+
+---
+
+### Task 5b: Load generator — rotate sessions, more ad traffic (added after final review)
+
+Why: k6 keeps one `sessionId` per VU forever (~6 sessions on the cluster), so the 25% fractional split on the session key often leaves a level that never runs; and GetAds runs only ~5–6 times/min, too few for profiler samples per level.
+
+**Files:**
+- Modify: `src/load-generator/script.js`
+
+**Interfaces:**
+- Consumes: `onStart()`, `sessionId`, `getAds()`, `browseProduct()`, `categories` in `script.js`.
+- Produces: a module constant `SESSION_ITERATIONS = 20` and an extracted `fetchAds(category, traceParent)` helper used by both `getAds()` and `browseProduct()`.
+
+- [ ] **Step 1:** In `httpScenario`, count iterations per VU; after every `SESSION_ITERATIONS` iterations set `sessionId = null` so the next iteration calls `onStart()` (new session ID, new person). ~2 minutes per session at the current 1–10 s sleep.
+- [ ] **Step 2:** Extract the ads request from `getAds()` into `fetchAds(category, traceParent)` (same URL logic, including `contextKeys=None` for null). `browseProduct()` also calls `fetchAds(randomChoice(categories), span.traceParent())` after the product request, like the real product page loading its ad slot. Leave task weights and sleeps unchanged.
+- [ ] **Step 3: Verify:** `docker compose ... up -d --build load-generator` with the stack (or a k6 `inspect`/short run if the full stack is not needed: `docker compose run --rm load-generator` for ~2 min) and confirm in Jaeger (`/jaeger/ui/api/v3/traces`) or ad logs: GetAds rate roughly 3–4× before, more than 6 distinct `session.id` values over 5 minutes, and all four `demo.ad.profile.level` values present. Stop what you started.
+- [ ] **Step 4: Commit** `feat(load-generator): rotate sessions and fetch ads on product views`
