@@ -63,6 +63,14 @@ dependencies {
         runtimeOnly "com.fasterxml.jackson.core:jackson-core:${jacksonVersion}",
                 "com.fasterxml.jackson.core:jackson-databind:${jacksonVersion}"
     }
+
+    testImplementation platform("org.junit:junit-bom:5.11.4")
+    testImplementation "org.junit.jupiter:junit-jupiter"
+    testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+}
+
+test {
+    useJUnitPlatform()
 }
 
 // Default protoSourceDir is in /opentelemetry-demo/pb. Optionally override the
@@ -161,5 +169,8 @@ tasks.named('distZip') {
     mustRunAfter('compileTestJava')
 }
 tasks.named('distTar') {
+    mustRunAfter('compileTestJava')
+}
+tasks.named('installDist') {
     mustRunAfter('compileTestJava')
 }
