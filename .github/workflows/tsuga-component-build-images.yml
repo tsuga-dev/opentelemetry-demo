@@ -118,6 +118,10 @@ jobs:
             tag_suffix: ad
             context: ./
             setup-qemu: true
+          - file: ./src/bidder/Dockerfile
+            tag_suffix: bidder
+            context: ./
+            setup-qemu: true
           - file: ./src/agent/Dockerfile
             tag_suffix: agent
             context: ./

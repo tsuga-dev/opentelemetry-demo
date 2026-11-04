@@ -76,6 +76,27 @@ services:
         condition: service_started
     logging: *logging
 
+  # Bidder service (uninstrumented third party)
+  bidder:
+    image: ${IMAGE_NAME}:${DEMO_VERSION}-bidder
+    container_name: bidder
+    build:
+      context: ./
+      dockerfile: ${BIDDER_DOCKERFILE}
+      cache_from:
+        - ${IMAGE_NAME}:${IMAGE_VERSION}-bidder
+    deploy:
+      resources:
+        limits:
+          memory: 20M
+    restart: unless-stopped
+    environment:
+      - BIDDER_PORT
+    networks:
+      default:
+        aliases: [bidder-astro, bidder-optics, bidder-generic]
+    logging: *logging
+
   # Cart service
   cart:
     image: ${IMAGE_NAME}:${DEMO_VERSION}-cart
