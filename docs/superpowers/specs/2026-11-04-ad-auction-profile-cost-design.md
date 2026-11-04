@@ -164,7 +164,7 @@ margin = winning_bid − cost         loss = cost > winning_bid
 - The optimal level is where one more unit of `w` adds as much bid as it costs:
   `base / (1 + w) = rate × cpu_per_unit`.
 
-Starting values: `rate` = $0.15/CPU-s, `base` = $0.0021, ~2 ms CPU per unit of `w`.
+Starting values: `rate` = $0.15/CPU-s, `base` = $0.0021, ~2 ms CPU per unit of `w`. Default shipped rate is **$0.20/CPU-s**: the winning bid is the max of 3 noisy bids, so measured winning bids run ~20% above the table (extreme ≈ $0.0082), and 0.15 left extreme at break-even.
 Expected (before factor and noise):
 
 | Level | w | CPU | Cost | Bid | Margin |
@@ -176,7 +176,7 @@ Expected (before factor and noise):
 
 Optimum at w ≈ 6, between medium and high. Actual CPU per unit depends on the node
 type and JVM, so these get recalibrated on the demo cluster; `rate` is the main knob.
-$0.15/CPU-s is about $540/CPU-hour, roughly 10,000× raw cloud pricing: that's the
+$0.20/CPU-s is about $720/CPU-hour, roughly 10,000× raw cloud pricing: that's the
 "fully loaded cost" framing.
 
 ### Telemetry
