@@ -107,7 +107,7 @@ public final class AdService {
 
   private static final double COST_PER_CPU_SECOND =
       Double.parseDouble(
-          Optional.ofNullable(System.getenv("AD_PROFILE_COST_PER_CPU_SECOND")).orElse("0.15"));
+          Optional.ofNullable(System.getenv("AD_PROFILE_COST_PER_CPU_SECOND")).orElse("0.20"));
 
   static Attributes auctionAdSpot(
       Auction auction,
