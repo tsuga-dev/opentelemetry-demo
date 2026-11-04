@@ -47,7 +47,7 @@ Two further stories come with it:
 - A realistic RTB protocol (OpenRTB etc.). A minimal JSON request/response is enough.
 - Changing what ads the frontend displays. The auction decides the price, not the
   creative.
-- Billing accuracy. Bids stay realistic ($0.001–0.01 per impression); the
+- Billing accuracy. Bids stay realistic ($0.001-0.01 per impression); the
   $/CPU-second rate is deliberately inflated and framed as the **fully loaded cost
   of profiling** (data stores, ML features, infra), not raw CPU price. Antonin's
   decision.
@@ -86,13 +86,13 @@ synthetic signals from context keys, session, loyalty level). Names are part of
 the design, since they are what shows up in the profiles:
 
 | Level | Wrapper | Stages called (in order) | Richness `w` |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | low | `profileLevelLow` | `matchSessionHistory` | 1 |
 | medium | `profileLevelMedium` | + `scoreCategoryAffinity` | 4 |
 | high | `profileLevelHigh` | + `computeLookalikeAudience` | 10 |
 | extreme | `profileLevelExtreme` | + `runPurchaseIntentModel` | 25 |
 
-So a sample's stack reads e.g. `getAds → … → profileLevelHigh → computeLookalikeAudience`,
+So a sample's stack reads e.g. `getAds -> ... -> profileLevelHigh -> computeLookalikeAudience`,
 and can be filtered by level frame or by stage frame.
 
 - Each stage's CPU work is sized so CPU time grows roughly in proportion to `w`
@@ -112,12 +112,12 @@ and can be filtered by level frame or by stage frame.
 - **Profiler (headline numbers, per level, per stage).** In Tsuga:
   `cpu_seconds = sum(profile.samples.ad where stack_trace:*<frame>*) / 20`
   (the profiler samples at 20 Hz; Tsuga docs say to keep the default).
-  `cost = cpu_seconds × rate`. Verified on the demo cluster on 2026-11-04 that
+  `cost = cpu_seconds x rate`. Verified on the demo cluster on 2026-11-04 that
   `stack_trace:*<method>*` filters work on this metric (`*Logarithmizer*` isolates
   the `adHighCpu` load). The profile metric has no request/session dimension and
   ~20 Hz resolution, so it cannot drive per-spot or per-session numbers.
 - **Span (per spot, per session, loss flag).** `ad` records the measured thread
-  CPU time and the derived cost `cpu_time × rate` on the span, with the rate from
+  CPU time and the derived cost `cpu_time x rate` on the span, with the rate from
   an env var (`AD_PROFILE_COST_PER_CPU_SECOND`), and whether the spot was sold at
   a loss (`cost > winning_bid`). *(My call: we can't assume Tsuga does per-span
   arithmetic for the loss tile; computing it in `ad` removes the dependency.)*
@@ -151,32 +151,32 @@ and can be filtered by level frame or by stage frame.
 
 ### The maths
 
-```
-cost   = cpu_seconds × rate
-bid    = base × bidder_factor × ln(1 + w) × noise
-margin = winning_bid − cost         loss = cost > winning_bid
+```text
+cost   = cpu_seconds x rate
+bid    = base x bidder_factor x ln(1 + w) x noise
+margin = winning_bid - cost         loss = cost > winning_bid
 ```
 
 - `ln(1 + w)`: diminishing returns.
-- `bidder_factor`: per-bidder valuation (e.g. `bidder-astro` 1.2× on astronomy
+- `bidder_factor`: per-bidder valuation (e.g. `bidder-astro` 1.2x on astronomy
   categories).
-- `noise`: ±20% random.
+- `noise`: +/-20% random.
 - The optimal level is where one more unit of `w` adds as much bid as it costs:
-  `base / (1 + w) = rate × cpu_per_unit`.
+  `base / (1 + w) = rate x cpu_per_unit`.
 
-Starting values: `rate` = $0.15/CPU-s, `base` = $0.0021, ~2 ms CPU per unit of `w`. Default shipped rate is **$0.20/CPU-s**: the winning bid is the max of 3 noisy bids, so measured winning bids run ~20% above the table (extreme ≈ $0.0082), and 0.15 left extreme at break-even.
+Starting values: `rate` = $0.15/CPU-s, `base` = $0.0021, ~2 ms CPU per unit of `w`. Default shipped rate is **$0.20/CPU-s**: the winning bid is the max of 3 noisy bids, so measured winning bids run ~20% above the table (extreme ~ $0.0082), and 0.15 left extreme at break-even.
 Expected (before factor and noise):
 
 | Level | w | CPU | Cost | Bid | Margin |
-|---|---|---|---|---|---|
+| --- | --- | --- | --- | --- | --- |
 | low | 1 | 2 ms | $0.0003 | $0.0015 | +79% |
 | medium | 4 | 8 ms | $0.0012 | $0.0034 | +65% |
 | high | 10 | 20 ms | $0.0030 | $0.0050 | +40% |
-| extreme | 25 | 50 ms | $0.0075 | $0.0068 | −10% |
+| extreme | 25 | 50 ms | $0.0075 | $0.0068 | -10% |
 
-Optimum at w ≈ 6, between medium and high. Actual CPU per unit depends on the node
+Optimum at w ~ 6, between medium and high. Actual CPU per unit depends on the node
 type and JVM, so these get recalibrated on the demo cluster; `rate` is the main knob.
-$0.20/CPU-s is about $720/CPU-hour, roughly 10,000× raw cloud pricing: that's the
+$0.20/CPU-s is about $720/CPU-hour, roughly 10,000x raw cloud pricing: that's the
 "fully loaded cost" framing.
 
 ### Telemetry
@@ -185,10 +185,10 @@ New attributes, declared in `telemetry-schema/attributes/ad.yaml` first and list
 in `telemetry-schema/services/ad.yaml`:
 
 | Attribute | Span | Meaning |
-|---|---|---|
+| --- | --- | --- |
 | `demo.ad.profile.level` | `buildProfile`, `GetAds` | `low` / `medium` / `high` / `extreme` |
 | `demo.ad.profile.cpu_time` | `buildProfile`, `GetAds` | CPU seconds spent building the profile (double) |
-| `demo.ad.profile.cost` | `GetAds` | CPU time × configured rate, USD (double) |
+| `demo.ad.profile.cost` | `GetAds` | CPU time x configured rate, USD (double) |
 | `demo.ad.auction.bidders.count` | `GetAds` | bidders called |
 | `demo.ad.auction.bids.count` | `GetAds` | valid bids received before deadline |
 | `demo.ad.auction.winner` | `GetAds` | winning bidder hostname, empty if unsold |

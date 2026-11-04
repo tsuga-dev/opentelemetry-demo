@@ -85,5 +85,5 @@ attributes:
     type: boolean
     brief: Whether the ad spot was sold at a loss
     stability: development
-    note: True when the visitor profile cost is greater than the winning bid, so the ad spot was sold at a loss. An unsold spot has a winning bid of 0, so it counts as a loss whenever the profile cost is greater than 0
+    note: True when the profile cost is greater than the winning bid. An unsold spot has a winning bid of 0, so it counts as a loss
     examples: [true, false]
