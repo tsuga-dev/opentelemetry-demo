@@ -28,6 +28,40 @@
         "on": true
       }
     },
+    "adProfileLevel": {
+      "description": "Visitor profile depth built by the ad service before each auction",
+      "state": "ENABLED",
+      "variants": {
+        "low": "low",
+        "medium": "medium",
+        "high": "high",
+        "extreme": "extreme"
+      },
+      "defaultVariant": "low",
+      "targeting": {
+        "fractional": [
+          [
+            "low",
+            25
+          ],
+          [
+            "medium",
+            25
+          ],
+          [
+            "high",
+            25
+          ],
+          [
+            "extreme",
+            25
+          ]
+        ]
+      },
+      "metadata": {
+        "schedulable": false
+      }
+    },
     "aiRunawayAgent": {
       "defaultVariant": "off",
       "description": "forces the agent to keep looping tool calls until it hits its recursion limit",
@@ -46,6 +80,15 @@
         "5sec": 5000,
         "off": 0
       }
+    },
+    "bidderSlow": {
+      "description": "Makes the bidder-astro third-party bidder slow enough to miss the auction deadline",
+      "state": "ENABLED",
+      "variants": {
+        "on": true,
+        "off": false
+      },
+      "defaultVariant": "off"
     },
     "cartFailure": {
       "defaultVariant": "off",

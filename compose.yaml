@@ -50,6 +50,9 @@ services:
     environment:
       - AD_PORT
       - AD_PROMETHEUS_PORT
+      - AD_BIDDER_URLS
+      - AD_AUCTION_DEADLINE_MS
+      - AD_PROFILE_COST_PER_CPU_SECOND
       - FLAGD_HOST
       - FLAGD_PORT
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://${OTEL_COLLECTOR_HOST}:${OTEL_COLLECTOR_PORT_HTTP}
@@ -74,6 +77,29 @@ services:
         condition: service_started
       flagd:
         condition: service_started
+      bidder:
+        condition: service_started
+    logging: *logging
+
+  # Bidder service (uninstrumented third party)
+  bidder:
+    image: ${IMAGE_NAME}:${DEMO_VERSION}-bidder
+    container_name: bidder
+    build:
+      context: ./
+      dockerfile: ${BIDDER_DOCKERFILE}
+      cache_from:
+        - ${IMAGE_NAME}:${IMAGE_VERSION}-bidder
+    deploy:
+      resources:
+        limits:
+          memory: 20M
+    restart: unless-stopped
+    environment:
+      - BIDDER_PORT
+    networks:
+      default:
+        aliases: [bidder-astro, bidder-optics, bidder-generic]
     logging: *logging
 
   # Cart service
