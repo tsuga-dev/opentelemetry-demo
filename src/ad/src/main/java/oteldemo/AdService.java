@@ -39,7 +39,12 @@ import org.apache.logging.log4j.Logger;
 import oteldemo.Demo.Ad;
 import oteldemo.Demo.AdRequest;
 import oteldemo.Demo.AdResponse;
+import oteldemo.auction.Auction;
+import oteldemo.auction.AuctionResult;
 import oteldemo.problempattern.GarbageCollectionTrigger;
+import oteldemo.profile.Profile;
+import oteldemo.profile.ProfileBuilder;
+import oteldemo.profile.ProfileLevel;
 import oteldemo.problempattern.CPULoad;
 import dev.openfeature.contrib.providers.flagd.FlagdOptions;
 import dev.openfeature.contrib.providers.flagd.FlagdProvider;
@@ -93,6 +98,59 @@ public final class AdService {
       AttributeKey.stringKey("demo.ad.request_type");
   private static final AttributeKey<String> adResponseTypeKey =
       AttributeKey.stringKey("demo.ad.response_type");
+
+  private static final String AD_PROFILE_LEVEL_FLAG = "adProfileLevel";
+  private static final String BIDDER_SLOW_FLAG = "bidderSlow";
+
+  private static final Auction AUCTION =
+      Auction.fromEnv(System.getenv("AD_BIDDER_URLS"), System.getenv("AD_AUCTION_DEADLINE_MS"));
+
+  private static final double COST_PER_CPU_SECOND =
+      Double.parseDouble(
+          Optional.ofNullable(System.getenv("AD_PROFILE_COST_PER_CPU_SECOND")).orElse("0.15"));
+
+  static Attributes auctionAdSpot(
+      Auction auction,
+      Client flags,
+      double costPerCpuSecond,
+      List<String> contextKeys,
+      String sessionId,
+      EvaluationContext ctx) {
+    try {
+      ProfileLevel level =
+          ProfileLevel.parse(flags.getStringValue(AD_PROFILE_LEVEL_FLAG, "low", ctx));
+      Profile profile = buildProfile(level, sessionId + contextKeys);
+      AuctionResult result =
+          auction.run(
+              level.richness, contextKeys, flags.getBooleanValue(BIDDER_SLOW_FLAG, false, ctx));
+      double cost = profile.cpuSeconds() * costPerCpuSecond;
+      return Attributes.builder()
+          .put("demo.ad.profile.level", level.attributeValue())
+          .put("demo.ad.profile.cpu_time", profile.cpuSeconds())
+          .put("demo.ad.profile.cost", cost)
+          .put("demo.ad.auction.bidders.count", result.biddersCalled())
+          .put("demo.ad.auction.bids.count", result.bidsReceived())
+          .put("demo.ad.auction.winner", result.winner())
+          .put("demo.ad.auction.winning_bid", result.winningBid())
+          .put("demo.ad.auction.loss", cost > result.winningBid())
+          .build();
+    } catch (RuntimeException e) {
+      logger.warn("Ad auction failed", e);
+      return Attributes.empty();
+    }
+  }
+
+  private static Profile buildProfile(ProfileLevel level, String seed) {
+    Span span = tracer.spanBuilder("buildProfile").startSpan();
+    try (Scope ignored = span.makeCurrent()) {
+      Profile profile = ProfileBuilder.build(level, seed);
+      span.setAttribute("demo.ad.profile.level", level.attributeValue());
+      span.setAttribute("demo.ad.profile.cpu_time", profile.cpuSeconds());
+      return profile;
+    } finally {
+      span.end();
+    }
+  }
 
   private void start() throws IOException {
     int port =
@@ -188,8 +246,9 @@ public final class AdService {
 
         Baggage baggage = Baggage.fromContextOrNull(Context.current());
         MutableContext evaluationContext = new MutableContext();
+        String sessionId = null;
         if (baggage != null) {
-          final String sessionId = baggage.getEntryValue("session.id");
+          sessionId = baggage.getEntryValue("session.id");
           span.setAttribute("session.id", sessionId);
           evaluationContext.setTargetingKey(sessionId);
           evaluationContext.add("session", sessionId);
@@ -233,6 +292,17 @@ public final class AdService {
             1,
             Attributes.of(
                 adRequestTypeKey, adRequestType.name(), adResponseTypeKey, adResponseType.name()));
+
+        if (AUCTION != null) {
+          span.setAllAttributes(
+              auctionAdSpot(
+                  AUCTION,
+                  ffClient,
+                  COST_PER_CPU_SECOND,
+                  req.getContextKeysList(),
+                  sessionId,
+                  evaluationContext));
+        }
 
         // Throw 1/10 of the time to simulate a failure when the feature flag is enabled
         if (ffClient.getBooleanValue(AD_FAILURE, false, evaluationContext) && random.nextInt(10) == 0) {

@@ -50,6 +50,9 @@ services:
     environment:
       - AD_PORT
       - AD_PROMETHEUS_PORT
+      - AD_BIDDER_URLS
+      - AD_AUCTION_DEADLINE_MS
+      - AD_PROFILE_COST_PER_CPU_SECOND
       - FLAGD_HOST
       - FLAGD_PORT
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://${OTEL_COLLECTOR_HOST}:${OTEL_COLLECTOR_PORT_HTTP}
@@ -73,6 +76,8 @@ services:
       otel-collector:
         condition: service_started
       flagd:
+        condition: service_started
+      bidder:
         condition: service_started
     logging: *logging
 

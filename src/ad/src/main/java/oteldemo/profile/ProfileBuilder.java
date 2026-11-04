@@ -7,12 +7,13 @@ package oteldemo.profile;
 
 import java.lang.management.ManagementFactory;
 import java.nio.charset.StandardCharsets;
+import java.security.DigestException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
 public final class ProfileBuilder {
 
-  static final int ROUNDS_PER_UNIT = 2000;
+  static final int ROUNDS_PER_UNIT = 54000;
 
   private static volatile byte[] sink;
 
@@ -71,9 +72,14 @@ public final class ProfileBuilder {
 
   private static void burn(byte[] state, int units) {
     MessageDigest digest = newDigest();
-    byte[] current = state;
-    for (int i = 0; i < units * ROUNDS_PER_UNIT; i++) {
-      current = digest.digest(current);
+    byte[] current = state.clone();
+    try {
+      for (int i = 0; i < units * ROUNDS_PER_UNIT; i++) {
+        digest.update(current);
+        digest.digest(current, 0, current.length);
+      }
+    } catch (DigestException e) {
+      throw new IllegalStateException(e);
     }
     System.arraycopy(current, 0, state, 0, state.length);
     sink = current;
