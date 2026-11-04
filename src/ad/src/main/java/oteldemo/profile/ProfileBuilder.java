@@ -29,7 +29,7 @@ public final class ProfileBuilder {
       case HIGH -> profileLevelHigh(state);
       case EXTREME -> profileLevelExtreme(state);
     }
-    return new Profile(level, threads.getCurrentThreadCpuTime() - start);
+    return new Profile(threads.getCurrentThreadCpuTime() - start);
   }
 
   static void profileLevelLow(byte[] state) {

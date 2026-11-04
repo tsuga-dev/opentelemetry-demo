@@ -5,7 +5,7 @@
 
 package oteldemo.profile;
 
-public record Profile(ProfileLevel level, long cpuNanos) {
+public record Profile(long cpuNanos) {
   public double cpuSeconds() {
     return cpuNanos / 1e9;
   }

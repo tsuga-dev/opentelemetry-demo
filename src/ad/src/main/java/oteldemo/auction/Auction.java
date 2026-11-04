@@ -80,7 +80,6 @@ public final class Auction {
           .get(deadline.toMillis() + 20, TimeUnit.MILLISECONDS);
     } catch (Exception ignored) {
     }
-    bids.forEach(f -> f.cancel(true));
 
     String winner = "";
     double winningBid = 0;
