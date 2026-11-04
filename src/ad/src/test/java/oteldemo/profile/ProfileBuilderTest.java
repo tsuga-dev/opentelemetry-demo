@@ -22,6 +22,17 @@ class ProfileBuilderTest {
   }
 
   @Test
+  void roundsPerUnitParsesEnv() {
+    assertEquals(7500, ProfileBuilder.roundsPerUnit("7500"));
+    assertEquals(7500, ProfileBuilder.roundsPerUnit(" 7500 "));
+    assertEquals(54000, ProfileBuilder.roundsPerUnit(null));
+    assertEquals(54000, ProfileBuilder.roundsPerUnit(""));
+    assertEquals(54000, ProfileBuilder.roundsPerUnit("abc"));
+    assertEquals(54000, ProfileBuilder.roundsPerUnit("0"));
+    assertEquals(54000, ProfileBuilder.roundsPerUnit("-5"));
+  }
+
+  @Test
   void richnessMatchesSpec() {
     assertEquals(1, ProfileLevel.LOW.richness);
     assertEquals(4, ProfileLevel.MEDIUM.richness);

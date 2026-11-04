@@ -13,7 +13,21 @@ import java.security.NoSuchAlgorithmException;
 
 public final class ProfileBuilder {
 
-  static final int ROUNDS_PER_UNIT = 54000;
+  private static final int DEFAULT_ROUNDS_PER_UNIT = 54000;
+
+  static final int ROUNDS_PER_UNIT = roundsPerUnit(System.getenv("AD_PROFILE_ROUNDS_PER_UNIT"));
+
+  static int roundsPerUnit(String value) {
+    if (value == null) {
+      return DEFAULT_ROUNDS_PER_UNIT;
+    }
+    try {
+      int rounds = Integer.parseInt(value.trim());
+      return rounds < 1 ? DEFAULT_ROUNDS_PER_UNIT : rounds;
+    } catch (NumberFormatException e) {
+      return DEFAULT_ROUNDS_PER_UNIT;
+    }
+  }
 
   private static volatile byte[] sink;
 
